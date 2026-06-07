@@ -43,10 +43,10 @@ echo "저장 디렉토리: $DIR_TO_SAVE"
     export PYTHONUNBUFFERED=1
 
     # ── Step 1: Main experiments (Linear kernel) ────────────────────────────
-    python "$SCRIPT_DIR/run.py" --dataset cwru --kernel linear --out-dir "./results/$DIR_TO_SAVE/linear" --workers 8
+    python "$SCRIPT_DIR/run.py" --dataset pu --kernel linear --out-dir "./results/$DIR_TO_SAVE/linear" --workers 8
 
-    # ── Step 2: Main experiments (RBF kernel) ───────────────────────────────
-    python "$SCRIPT_DIR/run.py" --dataset cwru --kernel rbf --out-dir "./results/$DIR_TO_SAVE/rbf" --workers 8
+    # # ── Step 2: Main experiments (RBF kernel) ───────────────────────────────
+    # python "$SCRIPT_DIR/run.py" --dataset pu --kernel rbf --out-dir "./results/$DIR_TO_SAVE/rbf" --workers 8
 
     # ── Step 3: 사후 분석 (전 커널 일괄 — per-kernel + cross-kernel 산출물 모두 생성)
     python "$SCRIPT_DIR/analysis.py" --results-root "./results/$DIR_TO_SAVE"

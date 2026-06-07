@@ -35,6 +35,7 @@ def make_feature_fns(
     fs: float,
     lifter_n: int | None = None,
     log1p: bool = True,
+    bandpass: list | tuple | None | str = "auto",
 ) -> dict:
     """
     일반 윈도우 기준 특징 추출 함수들을 담은 딕셔너리를 반환.
@@ -56,6 +57,11 @@ def make_feature_fns(
     log1p : bool
         True면 fft/env_spec magnitude에 log1p 압축 적용 후 z-score.
         False면 magnitude 그대로 z-score만 적용.
+    bandpass : list | tuple | None | str
+        env_spec 계산 시 적용할 bandpass.
+        "auto" (기본값): fs 기반 자동 계산 (2 kHz ~ min(8 kHz, Nyquist-1)).
+        None: bandpass 미적용 (전대역 → PU처럼 공진 대역 불명확한 경우 권장).
+        [low_hz, high_hz]: 명시적 범위.
 
     Returns
     -------
@@ -63,10 +69,15 @@ def make_feature_fns(
         특징 추출 함수 매핑 딕셔너리
     """
 
-    # Envelope bandpass: 2 kHz ~ 8 kHz, Nyquist(fs/2)를 초과하지 않도록 상한 클리핑.
-    # _bandpass_sos 제약: 0 < low < high < fs/2 (strictly). 상한이 2 kHz 이하면 미적용.
-    _bp_high = min(8000.0, fs / 2.0 - 1.0)
-    bp = (2000.0, _bp_high) if _bp_high > 2000.0 else None
+    # Envelope bandpass 결정
+    if bandpass == "auto":
+        # 기존 동작: 2 kHz ~ min(8 kHz, Nyquist-1)
+        _bp_high = min(8000.0, fs / 2.0 - 1.0)
+        bp = (2000.0, _bp_high) if _bp_high > 2000.0 else None
+    elif bandpass is None:
+        bp = None
+    else:
+        bp = (float(bandpass[0]), float(bandpass[1]))
 
     def _compress(mag: np.ndarray) -> np.ndarray:
         return np.log1p(mag) if log1p else mag

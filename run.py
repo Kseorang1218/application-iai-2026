@@ -12,19 +12,25 @@ per-window z-score: env_spec/cepstrum은 raw window에 먼저 적용.
   Dual boundary: r_inner = rho_inner · R, r_outer = rho_outer · R (R-ratio).
 """
 import contextlib
+import copy
 import io
 import pathlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+from box import Box
 import funs
 
 _root = pathlib.Path(__file__).parent
 
 _DOWNLOAD = {
     "cwru": lambda d: funs.download_cwru(str(d / "cwru"), "12k"),
+    "pu":   lambda d: funs.download_paderborn(str(d / "pu")),
+    "uos":  lambda d: funs.download_uos(str(d / "uos"), "16k"),
 }
 _POSTPROCESS = {
     "cwru": lambda df: df[df["label"] != 999],
+    "pu":   lambda df: df,
+    "uos":  lambda df: df,
 }
 
 def run_scenario(
@@ -41,7 +47,8 @@ def run_scenario(
     otta_mode: str = "dual_boundary",
 ) -> list[dict]:
     """한 (source, target) 시나리오에 대해 4 전처리 모두 실행."""
-    ws = config['window_size']
+    # 데이터셋별 window_size 오버라이드 (없으면 전역 기본값 사용)
+    ws = int(config.get("window_size_override", {}).get(dataset.lower(), config["window_size"]))
     seed = config['seed']
     scenario_id = f"{source_rpm}_to_{target_rpm}"
     scenario_label = f"{dataset} {source_key}({source_rpm}) → {target_key}({target_rpm})"
@@ -72,7 +79,10 @@ def run_scenario(
 
     # ----- Source feature 추출 (batch OK; SVDD pre-train) -----
     lifter_n = config.main.cepstrum_lifter_n.get(dataset.lower())
-    feature_fns = funs.make_feature_fns(fs, lifter_n=lifter_n, log1p=False)
+    # 데이터셋별 env_spec bandpass 조회 (config에 없으면 "auto" 기본값)
+    _bp_cfg = config.get("env_spec_bandpass", {}).get(dataset.lower(), "auto")
+    bandpass = "auto" if _bp_cfg == "auto" else (_bp_cfg if _bp_cfg is not None else None)
+    feature_fns = funs.make_feature_fns(fs, lifter_n=lifter_n, log1p=False, bandpass=bandpass)
     S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns.items()}
 
     # ----- Source validation feature 추출 (동일 파이프라인 적용) -----
@@ -80,6 +90,16 @@ def run_scenario(
 
     # ----- Target stream feature 추출 (window 1개씩 — OTTA 전제) -----
     T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns, {})
+
+    # ----- 데이터셋별 하이퍼파라미터 오버라이드 적용 -----
+    _ds_overrides = dict(config.get("dataset_overrides", {}).get(dataset.lower(), {}))
+    if _ds_overrides:
+        otta_config = copy.deepcopy(config.to_dict())
+        otta_config["main"].update(_ds_overrides)
+        otta_config = Box(otta_config)
+        print(f"  [override] {dataset} rho: inner={otta_config.main.rho_inner} outer={otta_config.main.rho_outer}")
+    else:
+        otta_config = config
 
     # ----- Per-preprocessing OTTA run -----
     print(f"\n[{scenario_label}] running 4 preprocessings → {scenario_dir}")
@@ -109,7 +129,7 @@ def run_scenario(
                 save_dir=prep_dir,
                 kernel_name=kernel_name,
                 scenario_label=scenario_label,
-                config=config,
+                config=otta_config,
                 config_section='main',
                 otta_mode=otta_mode,
                 buffer_cap=buffer_cap,
