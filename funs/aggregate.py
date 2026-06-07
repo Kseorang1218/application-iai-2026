@@ -1,8 +1,4 @@
-"""run.py 산출물 집계 — pilot/main 공통.
-
-이전엔 pilots/aggregate.py 에 있었으나, main 도 동일 함수를 사용하므로
-funs/ 로 옮겨 책임 분리 명확화.
-"""
+"""run.py 산출물 집계."""
 from __future__ import annotations
 
 import json
@@ -20,8 +16,7 @@ def aggregate_summary(
 
     산출물:
       zone_ratio_by_percentile.csv — percentile 조합 × group 전체 zone 점유율
-                                     (pilot 산출물만; OTTA run 에선 zone_ratio.json
-                                      이 없으므로 빈 결과)
+                                     (zone_ratio.json 이 없으면 빈 결과)
 
     반환:
       metrics_df — run × 핵심 metric DataFrame (kernel 컬럼 포함 시). 호출측에서

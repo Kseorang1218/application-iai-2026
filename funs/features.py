@@ -1,7 +1,7 @@
 """특징 추출 헬퍼 — 예비실험 파이프라인.
 
 이 모듈은 일반 윈도우 기준 특징 추출 함수들을 담은 딕셔너리를 생성하고,
-타겟 스트림의 특징을 순차적으로 추출 및 변환합니다.
+타겟 스트림의 특징을 순차적으로 추출 및 변환.
 
 P2(FFT)/P3(EnvSpec):
   magnitude 추출 → (선택적 log1p) → per-window z-score 순서 적용.
@@ -37,7 +37,7 @@ def make_feature_fns(
     log1p: bool = True,
 ) -> dict:
     """
-    일반 윈도우 기준 특징 추출 함수들을 담은 딕셔너리를 반환합니다.
+    일반 윈도우 기준 특징 추출 함수들을 담은 딕셔너리를 반환.
 
     fft / env_spec: magnitude 추출 → (log1p=True면 log1p 압축) → per-window z-score.
     cepstrum: raw window에 per-window z-score 적용 후 feature 추출.
@@ -82,13 +82,12 @@ def make_feature_fns(
 
 def extract_target_stream_features(X: np.ndarray, feature_fns: dict, scalers: dict) -> dict:
     """
-    타겟 스트림의 특징을 추출하고 학습된 스케일러를 적용합니다.
-    OTTA 전제에 따라 타겟 스트림은 윈도우 1개씩 순차적으로 처리됩니다.
-    실제 OTTA loop에서 SVDD inference/update가 들어갈 위치이며,
-    Pilot 실험은 모델을 frozen 상태로 평가하므로 특징 생성만 동일 패턴으로 재현합니다.
+    타겟 스트림의 특징을 추출하고 학습된 스케일러를 적용.
+    OTTA 전제에 따라 타겟 스트림은 윈도우 1개씩 순차적으로 처리.
+    실제 OTTA loop에서 SVDD inference/update가 들어갈 위치임.
 
     `scalers`에 없는 key(예: 'raw', 'fft' 등 per-window-norm 키)는
-    scaling을 건너뛰고 원본 값을 그대로 반환합니다.
+    scaling을 건너뛰고 원본 값을 그대로 반환.
 
     Parameters
     ----------

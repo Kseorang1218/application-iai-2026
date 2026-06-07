@@ -6,7 +6,7 @@ from models import LinearKernel, PolyKernel, RBFKernel, SVDD
 from .utils import median_heuristic_gamma
 
 
-def fit_svdd(X_train: np.ndarray, kernel_name: str, config: dict, config_section: str = 'pilot') -> SVDD:
+def fit_svdd(X_train: np.ndarray, kernel_name: str, config: dict, config_section: str = 'main') -> SVDD:
     """Source 학습 데이터로 SVDD 학습. C = 1 / (nu * N)."""
     N = X_train.shape[0]
     if N < 2:

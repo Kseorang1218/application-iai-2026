@@ -1,9 +1,6 @@
 """파이프라인 실행 모듈.
 
 - `run_otta(...)`   — main 실험 (DualBoundarySVDD pre-train + streaming OTTA).
-
-pilot batch 파이프라인(`run`)은 pilot 전용이므로 `pilot/pilots/pipeline.py`로
-이동했다.
 """
 from __future__ import annotations
 
@@ -61,9 +58,9 @@ def run_otta(
     산출물:
       svdd_model.npz / .json    — 최종 모델 (final SV/α/R²)
       scaler.npz                — feature scaler (scaler=None 이면 skip)
-      distances.npz             — pre-trained 모델 기준 source/target d (pilot 호환)
+      distances.npz             — pre-trained 모델 기준 source/target d
       otta_stream.npz           — per-sample decisions/scores/latencies/R_trace
-      metrics.json              — R + mmd² (pilot 호환)
+      metrics.json              — R + mmd²
     """
     save_dir.mkdir(parents=True, exist_ok=True)
     cfg = config[config_section]
@@ -118,7 +115,7 @@ def run_otta(
     # single_boundary warmup 길이 — dual_boundary 는 model.n_warmup 에서 읽음
     _n_warmup_sb = int(n_target_normal * warmup_ratio) if otta_mode == "single_boundary" else 0
 
-    # ── 2. Pre-trained 모델 기준 거리 (pilot 호환 distances.npz) ─────────────
+    # ── 2. Pre-trained 모델 기준 거리 ───────────────────────────────────────
     X_tgt_stream = np.asarray(X_tgt_stream, dtype=np.float32)
     y_true = np.asarray(y_tgt_stream, dtype=np.int32)
     X_tgt_normal = X_tgt_stream[y_true == 0]
@@ -220,7 +217,7 @@ def run_otta(
         R_final=np.array(R_final),
     )
 
-    # 분포 거리 (pilot metrics.json 호환)
+    # 분포 거리
     mmd2 = safe_mmd2(X_src_train, X_tgt_normal) if X_tgt_normal.shape[0] > 0 else float('nan')
     wass_d = safe_wasserstein(model.distance(X_src_train), model.distance(X_tgt_normal)) if X_tgt_normal.shape[0] > 0 else float('nan')
 

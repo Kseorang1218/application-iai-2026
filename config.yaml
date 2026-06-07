@@ -29,28 +29,6 @@ sampling_rate:
 # 슬라이딩 윈도우 크기
 window_size: 2048
 
-# 실험 상수
-pilot:
-  preprocessing_ids:
-    raw: "p1_raw"
-    fft: "p2_fft"
-    env_spec: "p3_envspec"
-    cepstrum: "p4_cepstrum"
-    order_env_spec: "p5_order"
-    tds: "p6_tds"
-  per_window_norm_keys: ["fft", "env_spec", "cepstrum", "order_env_spec", "tds"]
-  r_inner_percentiles: [50]
-  r_outer_percentiles: [95, 99, 99.5]
-  svdd_nu: 0.1
-  svdd_max_iter: 1000
-  svdd_tol: 0.001
-  order_min_revs: 8
-  tsne_subsample: 1000
-  cepstrum_lifter_n:
-    cwru: 64
-    uos:  2048
-    pu:   512
-
 # 본 실험 설정
 main:
   preprocessing_ids:
@@ -73,7 +51,7 @@ main:
   rho_outer: 1.5                 # r_outer = rho_outer · R  (R 바깥쪽 150%)
   warmup_ratio: 0.10             # n_warmup = int(n_target_normal · warmup_ratio)
   max_inner_iter: 10             # partial_fit 내 SMO 반복 상한 (KKT gap < tol 시 조기 종료)
-  # 분포 분석 (pilot 호환 — OTTA decision 에 직접 사용하지 않음)
+  # 분포 분석 (OTTA decision 에 직접 사용하지 않음)
   r_inner_percentiles: [50]
   r_outer_percentiles: [95, 99, 99.5]
   tsne_subsample: 1000

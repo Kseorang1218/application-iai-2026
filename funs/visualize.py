@@ -1,14 +1,10 @@
-"""시각화 모듈 — pilot/main 공통.
+"""시각화 모듈.
 
 본 모듈은 다음 두 종류의 시각화 primitive 를 포함한다:
   1. Figure primitive — `plot_distance_hist`, `plot_tsne`, `tsne_embedding`.
-     pilot pipeline / 진단 모듈이 직접 호출.
   2. Analysis-level CSV/NPZ 스캐너 시각화 — `plot_mmd_heatmap`,
      `plot_dual_boundary_polar`, `plot_tradeoff_csv`, `plot_cm_by_dataset`.
-     analysis.py / analysis_otta.py 가 사용. (이전엔 pilots/visualize.py 에 있었음)
-
-pilot 산출물 전용 wrapper(`_make_distance_hist_fig`, `_make_tsne_fig`)는
-`pilot/pilots/pipeline.py`로 이동했다.
+     analysis.py / analysis_otta.py 가 사용.
 """
 from __future__ import annotations
 
@@ -176,7 +172,7 @@ def plot_tsne(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Analysis-level: CSV/NPZ scanner 시각화 (이전 pilots/visualize.py 에서 이동)
+# Analysis-level: CSV/NPZ scanner 시각화
 # ─────────────────────────────────────────────────────────────────────────────
 
 def plot_mmd_heatmap(

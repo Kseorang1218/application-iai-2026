@@ -1,8 +1,4 @@
-"""Anomaly Detection 평가 — pilot/main 공통.
-
-본 모듈은 pilots/metrics/evaluator.py + pilots/evaluate.py 의 통합본이다.
-이전엔 main 이 pilots/* 를 직접 import 해 책임 분리가 깨졌으나, 평가 코드는
-pilot 전용이 아니라 pilot/main 공통 자원이므로 funs/ 로 옮겼다.
+"""Anomaly Detection 평가 모듈.
 
 Contents:
   Class

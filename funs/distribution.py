@@ -1,10 +1,7 @@
 """분포 측정/평가 모듈.
 
 SVDD 거리 기반 zone 점유율, 분포 거리 지표(MMD², Wasserstein)를 담당한다.
-pilot/main 공유 순수 계산 레이어 (I/O·시각화 없음).
-
-Boundary percentile 정책(`compute_zone_combinations`)과 pilot 산출물 dict 조립은
-pilot 전용이므로 `pilot/pilots/pipeline.py`로 이동했다.
+순수 계산 레이어 (I/O·시각화 없음).
 """
 from __future__ import annotations
 

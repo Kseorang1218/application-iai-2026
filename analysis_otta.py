@@ -74,8 +74,6 @@ def evaluate_otta_performance(
     aggregate 산출물 ({out_dir}/):
       otta_performance_all.csv    — 전체 run × OTTA 지표
 
-    `pilots.evaluate.evaluate_ad_performance` 와 컬럼명 일치 (AUC/F1/Recall/...) →
-    두 csv 를 outer-join 으로 비교 가능.
     """
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -234,9 +232,8 @@ def plot_cm_by_dataset_otta(
         otta_csv: pathlib.Path,
         out_dir: pathlib.Path,
     ) -> None:
-    """`pilots.visualize.plot_cm_by_dataset` 재사용 + 파일명에 `_otta` 접미.
+    """파일명에 `_otta` 접미 붙여 `plot_cm_by_dataset` 출력과 충돌 방지.
 
-    원 함수가 출력 파일명을 `cm_{dataset}.png` 로 고정해 baseline 과 충돌하므로,
     임시 폴더에 생성 후 rename → out_dir 로 이동.
     """
     otta_csv = pathlib.Path(otta_csv)
