@@ -1,0 +1,79 @@
+# 랜덤시드
+seed: 42
+
+# 데이터셋 별 도메인 정의
+cwru_domain:
+  A: 1730 
+  B: 1750
+  C: 1772
+  D: 1797
+
+pu_domain:
+  A: 900
+  B: 1500
+
+uos_domain:
+  A: 600
+  B: 800
+  C: 1000
+  D: 1200
+  E: 1400
+  F: 1600
+
+# 데이터셋별 샘플링 주파수 (Hz)
+sampling_rate:
+  cwru: 12000
+  pu: 64000
+  uos: 16000
+
+# 슬라이딩 윈도우 크기
+window_size: 2048
+
+# 실험 상수
+pilot:
+  preprocessing_ids:
+    raw: "p1_raw"
+    fft: "p2_fft"
+    env_spec: "p3_envspec"
+    cepstrum: "p4_cepstrum"
+    order_env_spec: "p5_order"
+    tds: "p6_tds"
+  per_window_norm_keys: ["fft", "env_spec", "cepstrum", "order_env_spec", "tds"]
+  r_inner_percentiles: [50]
+  r_outer_percentiles: [95, 99, 99.5]
+  svdd_nu: 0.1
+  svdd_max_iter: 1000
+  svdd_tol: 0.001
+  order_min_revs: 8
+  tsne_subsample: 1000
+  cepstrum_lifter_n:
+    cwru: 64
+    uos:  2048
+    pu:   512
+
+# 본 실험 설정
+main:
+  preprocessing_ids:
+    raw: "p1_raw"
+    env_spec: "p3_envspec"
+    cepstrum: "p4_cepstrum"
+    tds: "p6_tds"
+  per_window_norm_keys: ["env_spec", "cepstrum", "tds"]
+  cepstrum_lifter_n:
+    cwru: 64
+    uos:  2048
+    pu:   512
+  svdd_nu: 0.1
+  svdd_max_iter: 1000
+  svdd_tol: 0.001
+  # DualBoundarySVDD OTTA hyperparameters
+  buffer_size: 100               # OnlineSVDD SV 버퍼 슬롯 수 (constrained 실험용)
+  no_constraint_buffer_cap: 5000 # no_buffer_constraint 실험 시 PU처럼 N_src 큰 데이터셋 상한
+  rho_inner: 0.5                 # r_inner = rho_inner · R  (R 안쪽 50%)
+  rho_outer: 1.5                 # r_outer = rho_outer · R  (R 바깥쪽 150%)
+  warmup_ratio: 0.10             # n_warmup = int(n_target_normal · warmup_ratio)
+  max_inner_iter: 10             # partial_fit 내 SMO 반복 상한 (KKT gap < tol 시 조기 종료)
+  # 분포 분석 (pilot 호환 — OTTA decision 에 직접 사용하지 않음)
+  r_inner_percentiles: [50]
+  r_outer_percentiles: [95, 99, 99.5]
+  tsne_subsample: 1000

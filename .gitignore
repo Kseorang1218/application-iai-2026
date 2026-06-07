@@ -1,1 +1,13 @@
+# 임시 
 ref/
+
+__pycache__/
+
+# 실험 로그
+log/
+
+# 결과 저장 
+results/
+
+# 가상환경
+iai

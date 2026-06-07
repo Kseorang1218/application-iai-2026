@@ -1,0 +1,17 @@
+# Core Data Science / ML
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.3
+scikit-learn==1.7.2
+
+# Visualization
+matplotlib==3.10.8
+
+# Utils & Configuration
+PyYAML==6.0.3
+python-box==7.4.1
+requests==2.33.0
+patool==4.0.1
+
+# Local Package Install
+-e .
