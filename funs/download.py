@@ -110,7 +110,13 @@ def download_cwru(root: str, sample_rate: str = "12k") -> pd.DataFrame:
         if not os.path.isfile(filename):
             os.system(f"wget -O {filename} {BASE_URL + key}")
 
-        data = io.loadmat(filename)
+        try:
+            data = io.loadmat(filename)
+        except Exception:
+            print(f"[CWRU] {value}.mat 손상됨 — 재다운로드 중...")
+            os.remove(filename)
+            os.system(f"wget -O {filename} {BASE_URL + key}")
+            data = io.loadmat(filename)
         body = None
         for elem in data.keys():
             if "DE" in elem:

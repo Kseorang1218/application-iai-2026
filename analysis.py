@@ -60,7 +60,7 @@ from funs.visualize import (
     plot_tradeoff_csv,
 )
 
-_CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
+_CONFIG_PATH = pathlib.Path(__file__).parent / "config.yaml"
 
 
 def _discover_scenarios(results_root: pathlib.Path, kernel: str) -> list[tuple[str, str]]:

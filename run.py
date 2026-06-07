@@ -18,6 +18,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import funs
 
+_root = pathlib.Path(__file__).parent
+
 _DOWNLOAD = {
     "cwru": lambda d: funs.download_cwru(str(d / "cwru"), "12k"),
 }
@@ -127,8 +129,7 @@ def run_scenario(
         status = "OK" if "error" not in m else "ERR"
         print(f"  [{status}] {prep_id:12s}  "
               f"R={m.get('R', float('nan')):.3f}  "
-              f"R_final={m.get('R_final', float('nan')):.3f}  "
-              f"mmd²={m.get('mmd2')}")
+              f"R_final={m.get('R_final', float('nan')):.3f}  ")
 
     return scenario_metrics
 
@@ -149,8 +150,7 @@ def _run_scenario_worker(kwargs: dict) -> tuple[list[dict], str]:
 def main():
     args = funs.parse_args(description="Main Experiment Runner (DualBoundarySVDD OTTA)")
 
-    _root = pathlib.Path(__file__).parent.parent  # server/
-    config = funs.load_yaml(str(_root / "config.yaml"))
+    config = funs.load_yaml("./config.yaml")
     config["kernel"] = args.kernel
 
     dataset = args.dataset

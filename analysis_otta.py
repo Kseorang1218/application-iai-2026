@@ -33,7 +33,7 @@ from funs.evaluation import AnomalyDetectionEvaluator, KERNELS, build_rpm_domain
 from funs.visualize import plot_cm_by_dataset
 
 
-_CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
+_CONFIG_PATH = pathlib.Path(__file__).parent / "config.yaml"
 
 _DECISION_NAMES = {0: "NORMAL_SKIP", 1: "ADAPTED", 2: "ANOMALY"}
 

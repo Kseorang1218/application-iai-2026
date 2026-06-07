@@ -11,3 +11,11 @@ results/
 
 # 가상환경
 iai
+
+# editable install
+*.egg-info/
+
+# 데이터셋
+dataset/
+
+CLAUDE.md

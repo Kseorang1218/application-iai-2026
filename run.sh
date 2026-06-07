@@ -39,8 +39,7 @@ echo "로그 파일 경로: $LOG_FILE"
 echo "저장 디렉토리: $DIR_TO_SAVE"
 
 {
-    SERVER_DIR="$(dirname "$SCRIPT_DIR")"
-    source "$SERVER_DIR/iai/bin/activate"
+    source "$SCRIPT_DIR/iai/bin/activate"
     export PYTHONUNBUFFERED=1
 
     # ── Step 1: Main experiments (Linear kernel) ────────────────────────────
