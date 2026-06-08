@@ -3,7 +3,6 @@
 Contents:
   Class
     AnomalyDetectionEvaluator   — TP/TN/FP/FN/precision/recall/F1/AUC + CM 시각화
-    OTTAEvaluator               — streaming 평가 skeleton (현재 미사용)
   Function
     evaluate_ad_performance     — distances.npz scan → AD_performance_all.csv
     summarize_distance_ratios   — distances.npz scan → distance_ratio_summary.csv
@@ -28,14 +27,11 @@ from sklearn.metrics import roc_auc_score as _sklearn_roc_auc
 KERNELS = ("rbf", "linear")
 
 _PREP_LABEL = {
-    "p1_raw":      "P1 Raw",
-    "p2_fft":      "P2 FFT",
-    "p3_envspec":  "P3 EnvSpec",
-    "p4_cepstrum": "P4 Cepstrum",
-    "p5_order":      "P5 Order",
-    "p6_tds":        "P6 TDS",
-    "p6_stat":       "P6 TDS",
-    "p7_orderspec":  "P7 OrderSpec",
+    "p1_raw":       "P1 Raw",
+    "p3_envspec":   "P3 EnvSpec",
+    "p4_cepstrum":  "P4 Cepstrum",
+    "p6_tds":       "P6 TDS",
+    "p7_orderspec": "P7 OrderSpec",
 }
 
 
@@ -153,24 +149,6 @@ class AnomalyDetectionEvaluator:
         }
 
 
-class OTTAEvaluator(AnomalyDetectionEvaluator):
-    """OTTA 스트리밍 평가기 — 향후 확장용 skeleton.
-
-    현재는 미사용. main/analysis_otta.py 가 자체적으로 evaluate_otta_performance
-    를 구현해 사용 중.
-    """
-
-    def __init__(self) -> None:
-        self.history: list[dict] = []
-        self._step: int = 0
-
-    def update_step(self, y_true_step: int, y_score_step: float,
-                    y_pred_step: int, **kwargs) -> None:
-        pass
-
-    def get_adaptation_metrics(self) -> dict:
-        pass
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # helpers
@@ -179,7 +157,7 @@ class OTTAEvaluator(AnomalyDetectionEvaluator):
 def build_rpm_domain_map(cfg) -> dict[str, dict[int, str]]:
     """config 에서 {dataset: {rpm: domain_key}} 역매핑 생성."""
     result: dict[str, dict[int, str]] = {}
-    for dataset in ("cwru", "pu", "uos"):
+    for dataset in ("cwru",):
         domain_def = cfg.get(f"{dataset}_domain", {})
         result[dataset] = {int(rpm): key for key, rpm in domain_def.items()}
     return result

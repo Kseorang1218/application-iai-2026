@@ -23,10 +23,10 @@ TDS_FEATURE_NAMES = (
     "permutation_entropy",
 )
 
-# CWRU/PU/UOS 3개 dataset 공통 분석에서 universally redundant/zero-variance인 feature 제외 default
-#   - mean: AC sensor 특성상 항상 ≈ 0 (모든 dataset std ~ O(1e-3) 이하) → z-score 분모 0 위험
-#   - rms: std와 r=1.000 (3 dataset 전부, 평균 0 가정)
-#   - clearance_factor: impulse_factor와 r ≥ 0.99 (3 dataset 전부, 가우시안 norm 비례)
+# redundant/zero-variance feature 제외 default
+#   - mean: AC sensor 특성상 항상 ≈ 0 → z-score 분모 0 위험
+#   - rms: std와 r=1.000 (평균 0 가정)
+#   - clearance_factor: impulse_factor와 r ≥ 0.99 (가우시안 norm 비례)
 # 모든 13개 feature가 필요하면 `keep=TDS_FEATURE_NAMES` 전달
 DEFAULT_TDS_KEEP = (
     "std",
@@ -92,7 +92,7 @@ def time_domain_stats(
         shape `(N, window_size)` 의 2차원 배열. 각 row가 하나의 window
     keep : tuple[str, ...] or None
         반환할 feature 이름 (`TDS_FEATURE_NAMES` 부분집합).
-        None이면 `DEFAULT_TDS_KEEP` (CWRU/PU/UOS 공통 redundancy 제거된 10개) 사용.
+        None이면 `DEFAULT_TDS_KEEP` (redundancy 제거된 10개) 사용.
         전체 13개가 필요하면 `keep=TDS_FEATURE_NAMES` 전달.
     eps : float
         0 나눗셈 방지용 작은 값

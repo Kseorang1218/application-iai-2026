@@ -29,7 +29,6 @@ def run_otta(
         X_src_val: np.ndarray,
         X_tgt_stream: np.ndarray,
         y_tgt_stream: np.ndarray,
-        scaler,
         save_dir: pathlib.Path,
         kernel_name: str,
         scenario_label: str,
@@ -57,7 +56,6 @@ def run_otta(
 
     산출물:
       svdd_model.npz / .json    — 최종 모델 (final SV/α/R²)
-      scaler.npz                — feature scaler (scaler=None 이면 skip)
       distances.npz             — pre-trained 모델 기준 source/target d
       otta_stream.npz           — per-sample decisions/scores/latencies/R_trace
       metrics.json              — R + mmd²
@@ -79,7 +77,7 @@ def run_otta(
 
     # 버퍼 크기 결정:
     #   상한: buffer_cap 지정 시 min(N_src+N_stream, buffer_cap), 없으면 N_src+N_stream.
-    #   하한: buffer_size × C ≥ 1 feasibility 보장 (PU처럼 N_src 클 때 buffer×C<1 방지).
+    #   하한: buffer_size × C ≥ 1 feasibility 보장.
     min_feasible = math.ceil(1.0 / C) + 1
     natural_buffer = N_src + int(np.asarray(X_tgt_stream).shape[0])
     unbounded_buffer = min(natural_buffer, buffer_cap) if buffer_cap is not None else natural_buffer
@@ -191,8 +189,6 @@ def run_otta(
 
     # ── 4. 저장 ──────────────────────────────────────────────────────────────
     model.save(save_dir / "svdd_model")
-    if scaler is not None:
-        np.savez(save_dir / "scaler.npz", mean=scaler.mean_, std=scaler.std_)
 
     # Post-adaptation distances — 최종 모델 기준 재계산 (polar plot 비교용)
     _d_src_val_post = model.distance(X_src_val) if X_src_val.shape[0] > 0 else np.empty(0)

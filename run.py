@@ -24,13 +24,9 @@ _root = pathlib.Path(__file__).parent
 
 _DOWNLOAD = {
     "cwru": lambda d: funs.download_cwru(str(d / "cwru"), "12k"),
-    "pu":   lambda d: funs.download_paderborn(str(d / "pu")),
-    "uos":  lambda d: funs.download_uos(str(d / "uos"), "16k"),
 }
 _POSTPROCESS = {
     "cwru": lambda df: df[df["label"] != 999],
-    "pu":   lambda df: df,
-    "uos":  lambda df: df,
 }
 
 def run_scenario(
@@ -106,7 +102,7 @@ def run_scenario(
     S_val_feats = {k: fn(S_X_val) for k, fn in feature_fns_src.items()}
 
     # ----- Target stream feature 추출 (window 1개씩 — OTTA 전제) -----
-    T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns_tgt, {})
+    T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns_tgt)
 
     # ----- 데이터셋별 하이퍼파라미터 오버라이드 적용 -----
     _ds_overrides = dict(config.get("dataset_overrides", {}).get(dataset.lower(), {}))
@@ -142,7 +138,6 @@ def run_scenario(
                 X_src_val=X_src_val,
                 X_tgt_stream=T_X,
                 y_tgt_stream=T_y,
-                scaler=None,
                 save_dir=prep_dir,
                 kernel_name=kernel_name,
                 scenario_label=scenario_label,

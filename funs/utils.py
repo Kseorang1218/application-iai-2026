@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 
 ALLOWED_KERNELS = ["rbf", "linear", "poly"]
-ALLOWED_DATASETS = ["cwru", "pu", "uos"]
+ALLOWED_DATASETS = ["cwru"]
 
 
 def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
@@ -31,7 +31,7 @@ def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
         type=str,
         required=True,
         choices=ALLOWED_DATASETS,
-        help="사용할 데이터셋 (cwru, pu, uos)",
+        help="사용할 데이터셋 (cwru)",
     )
     parser.add_argument(
         "--kernel",

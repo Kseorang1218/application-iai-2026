@@ -48,7 +48,7 @@ def main() -> None:
         help="SVDD 커널 (기본값: linear)",
     )
     parser.add_argument(
-        "--dataset", default="cwru", choices=["cwru", "pu", "uos"],
+        "--dataset", default="cwru", choices=["cwru"],
         help="데이터셋 (기본값: cwru)",
     )
     parser.add_argument(
