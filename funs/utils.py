@@ -1,33 +1,10 @@
-"""공통 유틸리티 — YAML 로드, CLI 인자 파싱, RBF gamma 휴리스틱."""
+"""공통 유틸리티 — CLI 인자 파싱, RBF gamma 휴리스틱."""
 import argparse
 
 import numpy as np
-import yaml
-from box import Box
 
 ALLOWED_KERNELS = ["rbf", "linear", "poly"]
 ALLOWED_DATASETS = ["cwru", "pu", "uos"]
-
-
-def load_yaml(config_path: str) -> Box:
-    """
-    YAML 파일을 load하는 함수
-
-    Parameters
-    ----------
-    config_path : str
-        YAML 파일 경로
-
-    Returns
-    -------
-    Box
-        Box 개체
-    """
-    with open(config_path) as f:
-        config_yaml = yaml.load(f, Loader=yaml.FullLoader)
-        config = Box(config_yaml)
-
-    return config
 
 
 def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
