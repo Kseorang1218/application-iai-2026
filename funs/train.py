@@ -1,26 +1,9 @@
 """SVDD 학습 헬퍼 모듈."""
 import numpy as np
 
-from models import LinearKernel, PolyKernel, RBFKernel, SVDD
+from models import LinearKernel, PolyKernel, RBFKernel
 
 from .utils import median_heuristic_gamma
-
-
-def fit_svdd(X_train: np.ndarray, kernel_name: str, config: dict) -> SVDD:
-    """Source 학습 데이터로 SVDD 학습. C = 1 / (nu * N)."""
-    N = X_train.shape[0]
-    if N < 2:
-        raise ValueError(f"need ≥ 2 source-train samples, got {N}")
-    kernel = make_kernel(kernel_name, X_train)
-    C = 1.0 / (float(config['svdd_nu']) * N)
-    svdd = SVDD(
-        kernel=kernel,
-        C=C,
-        max_iter=int(config['svdd_max_iter']),
-        tol=float(config['svdd_tol']),
-    )
-    svdd.fit(X_train)
-    return svdd
 
 
 def make_kernel(name: str, X_train: np.ndarray):
