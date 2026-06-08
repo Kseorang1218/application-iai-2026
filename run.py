@@ -184,63 +184,65 @@ def _run_scenario_worker(kwargs: dict) -> tuple[list[dict], str]:
 # CLI entry
 # ============================================================================
 
-def main():
-    args = funs.parse_args(description="Main Experiment Runner (DualBoundarySVDD OTTA)")
+def run_experiment(
+    dataset: str,
+    kernel: str,
+    out_dir: str = "results",
+    workers: int = 1,
+    source: str | None = None,
+    target: str | None = None,
+    otta_mode: str = "dual_boundary",
+) -> None:
+    config = funs.get_config()
+    config["kernel"] = kernel
 
-    config = funs.load_yaml("./config.yaml")
-    config["kernel"] = args.kernel
-
-    dataset = args.dataset
     domain_dict = dict(config[f"{dataset}_domain"])
     fs = config["sampling_rate"][dataset]
     valid_keys = list(domain_dict.keys())
 
-    if args.source and args.source not in domain_dict:
-        raise ValueError(f"유효하지 않은 소스 도메인: {args.source}. ({dataset} 허용: {valid_keys})")
-    if args.target and args.target not in domain_dict:
-        raise ValueError(f"유효하지 않은 타겟 도메인: {args.target}. ({dataset} 허용: {valid_keys})")
+    if source and source not in domain_dict:
+        raise ValueError(f"유효하지 않은 소스 도메인: {source}. ({dataset} 허용: {valid_keys})")
+    if target and target not in domain_dict:
+        raise ValueError(f"유효하지 않은 타겟 도메인: {target}. ({dataset} 허용: {valid_keys})")
 
-    sources = [args.source] if args.source else valid_keys
-    targets = [args.target] if args.target else valid_keys
+    sources = [source] if source else valid_keys
+    targets = [target] if target else valid_keys
     pairs = [(s, t) for s in sources for t in targets if s != t]
 
     if not pairs:
         raise ValueError("실행 가능한 (source, target) 쌍이 없습니다. source != target 이어야 합니다.")
 
-    otta_mode = getattr(args, "otta_mode", "dual_boundary")
-    print(f"데이터셋: {dataset} | 시나리오: {len(pairs)}개 | 커널: {args.kernel} | OTTA 모드: {otta_mode}")
+    print(f"데이터셋: {dataset} | 시나리오: {len(pairs)}개 | 커널: {kernel} | OTTA 모드: {otta_mode}")
     for s, t in pairs:
         print(f"  {s}({domain_dict[s]}rpm) → {t}({domain_dict[t]}rpm)")
 
     dataset_dir = _root / "dataset"
     df = _POSTPROCESS[dataset](_DOWNLOAD[dataset](dataset_dir))
 
-    out_dir_name = getattr(args, "out_dir", "results")
-    results_root = pathlib.Path(__file__).parent / out_dir_name
+    results_root = pathlib.Path(out_dir)
     results_root.mkdir(parents=True, exist_ok=True)
 
-    n_workers = getattr(args, "workers", 1)
     job_kwargs = [
         dict(
             config=config, df=df, dataset=dataset, fs=fs,
             source_rpm=domain_dict[s_key], target_rpm=domain_dict[t_key],
             source_key=s_key, target_key=t_key,
             results_root=results_root,
-            kernel_name=args.kernel,
+            kernel_name=kernel,
             otta_mode=otta_mode,
         )
         for s_key, t_key in pairs
     ]
 
-    if n_workers == 1:
+    if workers == 1:
         for idx, (kw, (s_key, t_key)) in enumerate(zip(job_kwargs, pairs)):
             print(f"\n{'='*60}")
             print(f"시나리오 {idx+1}/{len(pairs)}: {dataset} {s_key}({kw['source_rpm']}rpm) → {t_key}({kw['target_rpm']}rpm)")
             print(f"{'='*60}")
             run_scenario(**kw)
     else:
-        print(f"\n[병렬 실행] workers={n_workers}, 총 {len(pairs)}개 시나리오")
-        with ProcessPoolExecutor(max_workers=n_workers) as ex:
+        print(f"\n[병렬 실행] workers={workers}, 총 {len(pairs)}개 시나리오")
+        with ProcessPoolExecutor(max_workers=workers) as ex:
             futs = {ex.submit(_run_scenario_worker, kw): (s, t) for kw, (s, t) in zip(job_kwargs, pairs)}
             done = 0
             for f in as_completed(futs):
@@ -254,6 +256,19 @@ def main():
                     print(captured, end="")
                 except Exception as e:
                     print(f"\n[{done}/{len(pairs)}] 실패: {s_key} → {t_key} — {type(e).__name__}: {e}")
+
+
+def main():
+    args = funs.parse_args(description="Main Experiment Runner (DualBoundarySVDD OTTA)")
+    run_experiment(
+        dataset=args.dataset,
+        kernel=args.kernel,
+        out_dir=getattr(args, "out_dir", "results"),
+        workers=getattr(args, "workers", 1),
+        source=args.source,
+        target=args.target,
+        otta_mode=getattr(args, "otta_mode", "dual_boundary"),
+    )
 
 if __name__ == "__main__":
     main()

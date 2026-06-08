@@ -28,12 +28,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from funs import load_yaml
+import funs
 from funs.evaluation import AnomalyDetectionEvaluator, KERNELS, build_rpm_domain_map
 from funs.visualize import plot_cm_by_dataset
 
-
-_CONFIG_PATH = pathlib.Path(__file__).parent / "config.yaml"
 
 _DECISION_NAMES = {0: "NORMAL_SKIP", 1: "ADAPTED", 2: "ANOMALY"}
 
@@ -492,6 +490,53 @@ def plot_R_trace_by_scenario(
     print(f"[R_trace] {len(groups)} scenarios processed")
 
 
+def run_analysis_otta(
+    results_root: pathlib.Path,
+    out_dir: pathlib.Path | None = None,
+    kernel: str | None = None,
+) -> None:
+    results_root = pathlib.Path(results_root)
+    eval_dir = out_dir or (results_root / "evaluation")
+    cfg = funs.get_config()
+    rpm_to_domain = build_rpm_domain_map(cfg)
+
+    if kernel:
+        kernels = [kernel]
+    else:
+        kernels = [
+            k.name for k in sorted(results_root.iterdir())
+            if k.is_dir() and k.name in KERNELS
+        ]
+
+    for k in kernels:
+        if not (results_root / k).exists():
+            print(f"[otta] {k} 폴더 없음 — skip")
+            continue
+
+        print(f"\n{'='*50}\n[otta] kernel={k}\n{'='*50}")
+        kernel_eval_dir     = eval_dir / k
+        kernel_analysis_dir = results_root / "analysis" / k
+
+        evaluate_otta_performance(
+            results_root, kernel_eval_dir,
+            rpm_to_domain=rpm_to_domain, kernel_filter=k,
+        )
+
+        plot_cm_by_dataset_otta(
+            kernel_eval_dir / "otta_performance_all.csv", kernel_analysis_dir,
+        )
+
+        plot_baseline_vs_otta(
+            baseline_csv=eval_dir / "AD_performance_all.csv",
+            otta_csv=kernel_eval_dir / "otta_performance_all.csv",
+            out_csv=kernel_eval_dir / "baseline_vs_otta.csv",
+            out_dir=kernel_analysis_dir,
+            kernel_filter=k,
+        )
+
+    plot_R_trace_by_scenario(results_root, rpm_domain_map=rpm_to_domain)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="OTTA streaming 결과 사후 분석 (analysis.py 의 OTTA 버전)"
@@ -509,51 +554,11 @@ def main() -> None:
         help="지정 시 해당 커널만 처리. 미지정 시 results-root 에서 발견된 모든 커널 처리.",
     )
     args = parser.parse_args()
-
-    eval_dir = args.out_dir or (args.results_root / "evaluation")
-    cfg = load_yaml(_CONFIG_PATH)
-    rpm_to_domain = build_rpm_domain_map(cfg)
-
-    # 처리할 커널 목록 결정
-    if args.kernel:
-        kernels = [args.kernel]
-    else:
-        kernels = [
-            k.name for k in sorted(args.results_root.iterdir())
-            if k.is_dir() and k.name in KERNELS
-        ]
-
-    for kernel in kernels:
-        if not (args.results_root / kernel).exists():
-            print(f"[otta] {kernel} 폴더 없음 — skip")
-            continue
-
-        print(f"\n{'='*50}\n[otta] kernel={kernel}\n{'='*50}")
-        kernel_eval_dir     = eval_dir / kernel
-        kernel_analysis_dir = args.results_root / "analysis" / kernel
-
-        # Step 1: per-run + aggregate OTTA 평가
-        evaluate_otta_performance(
-            args.results_root, kernel_eval_dir,
-            rpm_to_domain=rpm_to_domain, kernel_filter=kernel,
-        )
-
-        # Step 2: dataset 패널 OTTA CM
-        plot_cm_by_dataset_otta(
-            kernel_eval_dir / "otta_performance_all.csv", kernel_analysis_dir,
-        )
-
-        # Step 3: baseline vs OTTA 비교 (csv + scatter + boxplot)
-        plot_baseline_vs_otta(
-            baseline_csv=eval_dir / "AD_performance_all.csv",
-            otta_csv=kernel_eval_dir / "otta_performance_all.csv",
-            out_csv=kernel_eval_dir / "baseline_vs_otta.csv",
-            out_dir=kernel_analysis_dir,
-            kernel_filter=kernel,
-        )
-
-    # Step 4: 시나리오별 R_trace panel (이미 kernel 폴더 내부에 저장)
-    plot_R_trace_by_scenario(args.results_root, rpm_domain_map=rpm_to_domain)
+    run_analysis_otta(
+        results_root=args.results_root,
+        out_dir=args.out_dir,
+        kernel=args.kernel,
+    )
 
 
 if __name__ == "__main__":

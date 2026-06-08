@@ -46,7 +46,7 @@ import pathlib
 
 import pandas as pd
 
-from funs import load_yaml
+import funs
 from funs.aggregate import aggregate_summary
 from funs.evaluation import (
     KERNELS,
@@ -59,9 +59,6 @@ from funs.visualize import (
     plot_dual_boundary_polar,
     plot_tradeoff_csv,
 )
-
-_CONFIG_PATH = pathlib.Path(__file__).parent / "config.yaml"
-
 
 def _discover_scenarios(results_root: pathlib.Path, kernel: str) -> list[tuple[str, str]]:
     """results_root/{kernel}/{dataset}/{scenario_id}/ 구조에서 모든 시나리오 탐색."""
@@ -84,37 +81,28 @@ def _discover_kernels(results_root: pathlib.Path) -> list[str]:
     return [k for k in KERNELS if (results_root / k).is_dir()]
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Main 결과 사후 분석 (전 커널 일괄: aggregate + AD evaluation + 시각화)"
-    )
-    parser.add_argument(
-        "--results-root", type=pathlib.Path, required=True,
-        help="run.py 산출물이 들어 있는 루트 (예: results/0504).",
-    )
-    parser.add_argument(
-        "--out-dir", type=pathlib.Path, default=None,
-        help="출력 디렉토리. 미지정 시 `<results-root>/analysis`",
-    )
-    args = parser.parse_args()
+def run_analysis(
+    results_root: pathlib.Path,
+    out_dir: pathlib.Path | None = None,
+) -> None:
+    results_root = pathlib.Path(results_root)
+    analysis_dir = out_dir or (results_root / "analysis")
+    eval_dir     = results_root / "evaluation"
 
-    analysis_dir = args.out_dir or (args.results_root / "analysis")
-    eval_dir     = args.results_root / "evaluation"
-
-    kernels = _discover_kernels(args.results_root)
+    kernels = _discover_kernels(results_root)
     if not kernels:
-        print(f"[analysis] {args.results_root} 에서 커널 디렉토리({'/'.join(KERNELS)})를 찾지 못함 — 종료")
+        print(f"[analysis] {results_root} 에서 커널 디렉토리({'/'.join(KERNELS)})를 찾지 못함 — 종료")
         return
     print(f"[analysis] 발견된 커널: {kernels}")
 
-    cfg = load_yaml(_CONFIG_PATH)
+    cfg = funs.get_config()
     rpm_to_domain = build_rpm_domain_map(cfg)
     preps = list(cfg.main.preprocessing_ids.values())
 
     # ── Step 1 (per-kernel): aggregate → run_metrics.csv + zone_ratio_by_percentile.csv
     for kernel in kernels:
         print(f"\n[summary] aggregating {kernel} …")
-        df = aggregate_summary(args.results_root / kernel, out_dir=eval_dir / kernel, kernel=kernel)
+        df = aggregate_summary(results_root / kernel, out_dir=eval_dir / kernel, kernel=kernel)
         if not df.empty:
             (eval_dir / kernel).mkdir(parents=True, exist_ok=True)
             run_metrics_path = eval_dir / kernel / "run_metrics.csv"
@@ -134,7 +122,7 @@ def main() -> None:
         print(f"[summary] domain_shift_performance.csv → {out_path}  ({len(merged)} rows)")
 
     # ── Step 3 (cross-kernel): distances.npz → AD_performance_all.csv + per-run CM
-    evaluate_ad_performance(args.results_root, eval_dir, rpm_to_domain=rpm_to_domain)
+    evaluate_ad_performance(results_root, eval_dir, rpm_to_domain=rpm_to_domain)
 
     # ── Step 4: AD_performance_all.csv → cm_{dataset}.png (per-kernel)
     cm_csv = eval_dir / "AD_performance_all.csv"
@@ -148,13 +136,29 @@ def main() -> None:
 
     # ── Step 6 (per-kernel): distances.npz → {kernel}/{ds}/{sc}/dual_boundary_polar.png
     for kernel in kernels:
-        scenarios = _discover_scenarios(args.results_root, kernel)
+        scenarios = _discover_scenarios(results_root, kernel)
         if scenarios:
             print(f"\n[dual_boundary] {kernel}: {len(scenarios)} scenarios")
-            plot_dual_boundary_polar(args.results_root, kernel, scenarios, prep_order=preps)
+            plot_dual_boundary_polar(results_root, kernel, scenarios, prep_order=preps)
 
     # ── Step 7 (cross-kernel): distances.npz → analysis/distance_ratio_summary.csv
-    summarize_distance_ratios(args.results_root, analysis_dir, rpm_to_domain=rpm_to_domain)
+    summarize_distance_ratios(results_root, analysis_dir, rpm_to_domain=rpm_to_domain)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Main 결과 사후 분석 (전 커널 일괄: aggregate + AD evaluation + 시각화)"
+    )
+    parser.add_argument(
+        "--results-root", type=pathlib.Path, required=True,
+        help="run.py 산출물이 들어 있는 루트 (예: results/0504).",
+    )
+    parser.add_argument(
+        "--out-dir", type=pathlib.Path, default=None,
+        help="출력 디렉토리. 미지정 시 `<results-root>/analysis`",
+    )
+    args = parser.parse_args()
+    run_analysis(results_root=args.results_root, out_dir=args.out_dir)
 
 
 if __name__ == "__main__":
