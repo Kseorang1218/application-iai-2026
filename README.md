@@ -40,7 +40,7 @@ Cepstrum (`p4_cepstrum`) 단일 사용.
 | 데이터셋 | window size | lifter_n |
 |---------|------------|---------|
 | CWRU | 2048 | 64 |
-| PU | 8192 | 4096 |
+| PU | 4096 | 512 |
 
 raw window → per-window z-score → real cepstrum → liftering
 

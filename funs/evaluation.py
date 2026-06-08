@@ -158,7 +158,7 @@ def build_rpm_domain_map(cfg) -> dict[str, dict[int, str]]:
     """config 에서 {dataset: {rpm: domain_key}} 역매핑 생성."""
     result: dict[str, dict[int, str]] = {}
     for dataset in ("cwru", "pu"):
-        domain_def = cfg.get(f"{dataset}_domain", {})
+        domain_def = cfg.get(dataset, {}).get("domains", {})
         result[dataset] = {int(rpm): key for key, rpm in domain_def.items()}
     return result
 

@@ -9,4 +9,4 @@ from .pipeline import *
 from .train import *
 from .evaluation import *
 from .aggregate import *
-from .config_data import get_config
+from .config import get_config

@@ -111,7 +111,7 @@ def run_analysis(
 
     cfg = funs.get_config()
     rpm_to_domain = build_rpm_domain_map(cfg)
-    preps = list(cfg.preprocessing_ids.values())
+    preps = list(cfg["preprocessing_ids"].values())
 
     # ── Step 1 (per-kernel): aggregate → run_metrics.csv + zone_ratio_by_percentile.csv
     for kernel in kernels:

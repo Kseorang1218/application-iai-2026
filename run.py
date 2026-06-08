@@ -7,12 +7,10 @@ DualBoundarySVDD를 pre-train한 뒤, target stream을 1-sample씩 순차
 산출물 디렉토리: `results/{date}/{dataset}/{scenario_id}/{prep_id}/`
 """
 import contextlib
-import copy
 import io
 import pathlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from box import Box
 import funs
 
 _root = pathlib.Path(__file__).parent
@@ -39,7 +37,7 @@ def run_scenario(
     otta_mode: str = "dual_boundary",
 ) -> list[dict]:
     """한 (source, target) 시나리오에 대해 cepstrum 전처리 실행."""
-    ws = int(config.get("window_size_override", {}).get(dataset, config["window_size"]))
+    ws = config[dataset]["window_size"]
     seed = config['seed']
     scenario_id = f"{source_rpm}_to_{target_rpm}"
     scenario_label = f"{dataset} {source_key}({source_rpm}) → {target_key}({target_rpm})"
@@ -66,21 +64,14 @@ def run_scenario(
     )
 
     # ----- Feature 추출 -----
-    lifter_n = int(config['cepstrum_lifter_n'][dataset])
+    lifter_n = config[dataset]["lifter_n"]
     feature_fns = funs.make_feature_fns(lifter_n=lifter_n)
 
     S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns.items()}
     S_val_feats   = {k: fn(S_X_val)   for k, fn in feature_fns.items()}
     T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns)
 
-    # ----- 데이터셋별 하이퍼파라미터 오버라이드 적용 -----
-    _ds_overrides = dict(config.get("dataset_overrides", {}).get(dataset, {}))
-    if _ds_overrides:
-        otta_config = Box(copy.deepcopy(config.to_dict()))
-        otta_config.update(_ds_overrides)
-        print(f"  [override] {dataset} rho: inner={otta_config['rho_inner']} outer={otta_config['rho_outer']}")
-    else:
-        otta_config = config
+    otta_config = {**config, **config[dataset]}
 
     # ----- Per-preprocessing OTTA run -----
     print(f"\n[{scenario_label}] running {len(config['preprocessing_ids'])} preprocessings → {scenario_dir}")
@@ -154,8 +145,8 @@ def run_experiment(
     otta_mode: str = "dual_boundary",
 ) -> None:
     config = funs.get_config()
-    domain_dict = dict(config[f"{dataset}_domain"])
-    fs = config["sampling_rate"][dataset]
+    domain_dict = dict(config[dataset]["domains"])
+    fs = config[dataset]["sampling_rate"]
     valid_keys = list(domain_dict.keys())
 
     if source and source not in domain_dict:

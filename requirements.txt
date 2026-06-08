@@ -9,6 +9,5 @@ scikit-learn==1.7.2
 matplotlib==3.10.8
 
 # Utils & Configuration
-python-box==7.4.1
 requests==2.33.0
 patool==4.0.1
