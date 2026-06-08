@@ -40,7 +40,7 @@ window_size_override:
 # 데이터셋별 env_spec bandpass (null=전대역, [low_hz, high_hz]=명시적 범위)
 # PU: 64 kHz에서 2-8 kHz bandpass는 PU 베어링 공진 대역과 맞지 않아 전대역 사용
 env_spec_bandpass:
-  cwru: [2000, 6000]
+  cwru: [2000, 5900]   # Nyquist=6000Hz이므로 상한을 5900으로 설정
   pu: null
   uos: null
 
@@ -50,6 +50,28 @@ dataset_overrides:
   pu:
     rho_inner: 0.5
     rho_outer: 1.2
+    # raw: RPM-dependent amplitude, 정보 없음
+    # order_spec: n_revs=1 → 정수 order만 포착, 비정수 결함 order(BPFO≈3.56 등) 누락
+    preprocessing_ids:
+      env_spec: "p3_envspec"
+      cepstrum: "p4_cepstrum"
+      tds: "p6_tds"
+
+# Order envelope spectrum 파라미터
+# samples_per_rev: 회전당 angular resample 수 (order Nyquist = spr/2)
+# max_order: 보유할 최대 order (베어링 결함 order는 보통 < 15)
+# n_revs: 도메인 간 feature 차원 통일을 위해 RPM이 달라도 동일한 회전 수 사용
+#   계산 근거 (window_size/fs × rpm_min/60 의 floor):
+#     cwru: floor(2048/12000 × 1730/60) = floor(4.94) = 4  → 0.25-order 해상도
+#     pu:   floor(8192/64000 × 900/60)  = floor(1.92) = 1  → 1-order 해상도
+#     uos:  floor(2048/16000 × 600/60)  = floor(1.28) = 1  → 1-order 해상도
+order_spec_params:
+  samples_per_rev: 64
+  max_order: 20.0
+  n_revs:
+    cwru: 4
+    pu: 1
+    uos: 1
 
 # 본 실험 설정
 main:
@@ -58,11 +80,12 @@ main:
     env_spec: "p3_envspec"
     cepstrum: "p4_cepstrum"
     tds: "p6_tds"
+    order_spec: "p7_orderspec"
   per_window_norm_keys: ["env_spec", "cepstrum", "tds"]
   cepstrum_lifter_n:
     cwru: 64
     uos:  2048
-    pu:   512
+    pu:   4096
   svdd_nu: 0.1
   svdd_max_iter: 1000
   svdd_tol: 0.001

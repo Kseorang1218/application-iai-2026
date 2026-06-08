@@ -69,7 +69,8 @@ def run_scenario(
     )
 
     main_cfg = config['main']
-    preprocessing_ids = main_cfg['preprocessing_ids']
+    _ds_cfg = config.get("dataset_overrides", {}).get(dataset.lower(), {})
+    preprocessing_ids = _ds_cfg.get("preprocessing_ids", main_cfg['preprocessing_ids'])
 
     # ----- Windowing: source validation (normal only, boundary calibration용) -----
     source_val_normal = source_val_raw[source_val_raw["is_anomaly"] == 0]
@@ -77,19 +78,35 @@ def run_scenario(
         source_val_normal, window_size=ws, stride=ws,
     )
 
-    # ----- Source feature 추출 (batch OK; SVDD pre-train) -----
+    # ----- Feature 추출 공통 파라미터 -----
     lifter_n = config.main.cepstrum_lifter_n.get(dataset.lower())
     # 데이터셋별 env_spec bandpass 조회 (config에 없으면 "auto" 기본값)
     _bp_cfg = config.get("env_spec_bandpass", {}).get(dataset.lower(), "auto")
     bandpass = "auto" if _bp_cfg == "auto" else (_bp_cfg if _bp_cfg is not None else None)
-    feature_fns = funs.make_feature_fns(fs, lifter_n=lifter_n, log1p=False, bandpass=bandpass)
-    S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns.items()}
+
+    # order_spec: samples_per_rev / max_order 는 전역, n_revs 는 dataset별
+    _osp_cfg = dict(config.get("order_spec_params", {}))
+    _n_revs_map = dict(_osp_cfg.pop("n_revs", {})) if "n_revs" in _osp_cfg else {}
+    order_params = {**_osp_cfg, "n_revs": _n_revs_map.get(dataset.lower())}
+
+    # source/target 도메인은 RPM이 다르므로 별도 feature_fns 생성
+    feature_fns_src = funs.make_feature_fns(
+        fs, lifter_n=lifter_n, log1p=False, bandpass=bandpass,
+        rpm=source_rpm, order_spec_params=order_params,
+    )
+    feature_fns_tgt = funs.make_feature_fns(
+        fs, lifter_n=lifter_n, log1p=False, bandpass=bandpass,
+        rpm=target_rpm, order_spec_params=order_params,
+    )
+
+    # ----- Source feature 추출 (batch OK; SVDD pre-train) -----
+    S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns_src.items()}
 
     # ----- Source validation feature 추출 (동일 파이프라인 적용) -----
-    S_val_feats = {k: fn(S_X_val) for k, fn in feature_fns.items()}
+    S_val_feats = {k: fn(S_X_val) for k, fn in feature_fns_src.items()}
 
     # ----- Target stream feature 추출 (window 1개씩 — OTTA 전제) -----
-    T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns, {})
+    T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns_tgt, {})
 
     # ----- 데이터셋별 하이퍼파라미터 오버라이드 적용 -----
     _ds_overrides = dict(config.get("dataset_overrides", {}).get(dataset.lower(), {}))

@@ -32,9 +32,10 @@ _PREP_LABEL = {
     "p2_fft":      "P2 FFT",
     "p3_envspec":  "P3 EnvSpec",
     "p4_cepstrum": "P4 Cepstrum",
-    "p5_order":    "P5 Order",
-    "p6_tds":      "P6 TDS",
-    "p6_stat":     "P6 TDS",
+    "p5_order":      "P5 Order",
+    "p6_tds":        "P6 TDS",
+    "p6_stat":       "P6 TDS",
+    "p7_orderspec":  "P7 OrderSpec",
 }
 
 

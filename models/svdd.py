@@ -20,6 +20,11 @@ import json
 import warnings
 from pathlib import Path
 
+try:
+    import cupy as xp
+except ImportError:
+    import numpy as xp
+
 import numpy as np
 
 from typing import Any
@@ -30,10 +35,15 @@ from .kernels import RBFKernel
 EPS_F32: float = float(np.finfo(np.float32).eps) * 10
 
 
+def _to_numpy(arr) -> np.ndarray:
+    """CuPy 배열이면 CPU로 이동, numpy이면 그대로 반환."""
+    return arr.get() if hasattr(arr, 'get') else np.asarray(arr)
+
+
 # 공통 R² 산출 헬퍼 (OnlineSVDD 도 import 해서 사용)
 def _compute_R2(
-    d2: np.ndarray,
-    alpha: np.ndarray,
+    d2,
+    alpha,
     C: float,
     eps: float = EPS_F32,
 ) -> float:
@@ -66,7 +76,7 @@ def _compute_R2(
         RuntimeWarning,
         stacklevel=2,
     )
-    return float(np.quantile(d2, 0.95))
+    return float(xp.quantile(d2, 0.95))
 
 
 class SVDD:
@@ -104,14 +114,14 @@ class SVDD:
         self.max_iter: int = int(max_iter)
         self.tol: float = float(tol)
 
-        self.X_sv: np.ndarray | None = None
-        self.alpha: np.ndarray | None = None
+        self.X_sv = None
+        self.alpha = None
         self.R2: float | None = None
         self._center_norm_sq: float | None = None  # α^T K_sv α (재추론 시 상수)
         self.n_iter_: int = 0
 
     # --------------------------------------------------------------- fit ---
-    def fit(self, X: np.ndarray) -> "SVDD":
+    def fit(self, X) -> "SVDD":
         """Batch SMO 학습.
 
         SMO inner step (maximum violating pair):
@@ -127,7 +137,7 @@ class SVDD:
         f = Kα 캐시는 한 행만 업데이트:
             f_l ← f_l + Δ (K_il - K_jl)
         """
-        X = np.asarray(X, dtype=np.float32)
+        X = xp.asarray(X, dtype=xp.float32)
         if X.ndim != 2:
             raise ValueError(f"X must be 2-D, got shape {X.shape}")
         N = X.shape[0]
@@ -137,25 +147,22 @@ class SVDD:
                 f"Increase C (≥ 1/N = {1.0 / N:.4g})."
             )
 
-        K = self.kernel(X, X)                # (N, N)
-        K_diag = self.kernel.diag(X)         # (N,) — RBF: all 1
+        K = self.kernel(X, X)                # (N, N) — GPU
+        K_diag = self.kernel.diag(X)         # (N,) — GPU
 
-        alpha = np.full(N, 1.0 / N, dtype=np.float32)
-        f = K @ alpha                        # (N,) — (Kα)_l
+        alpha = xp.full(N, 1.0 / N, dtype=xp.float32)
+        f = K @ alpha                        # (N,) — GPU
 
         eps = EPS_F32
         # C2 fix (2026-05-12): 막힌 (i,j) 페어 (eta≈0 또는 box-clipped Δ≈0)
-        # 를 일시 mask 하고 다른 violating pair 로 진행. 기존엔 첫 막힘에서 즉시
-        # break 하여 KKT 미만족 sub-optimal 반환되던 문제 수정.
-        # 진전이 발생하면 모든 박스/etaCnstr 가 갱신되므로 blocked 를 reset.
+        # 를 일시 mask 하고 다른 violating pair 로 진행.
         blocked: set[tuple[int, int]] = set()
-        # 통계 (sanity / 분석용)
         self._c2_n_blocked_events: int = 0
         self._c2_n_progress_resets: int = 0
 
         n_iter = 0
         for n_iter in range(1, self.max_iter + 1):
-            g = K_diag - 2.0 * f             # ∂W/∂α
+            g = K_diag - 2.0 * f             # ∂W/∂α — GPU
 
             up_mask = alpha < self.C - eps   # α_i 를 더 늘릴 수 있는 인덱스
             low_mask = alpha > eps           # α_j 를 더 줄일 수 있는 인덱스
@@ -163,24 +170,23 @@ class SVDD:
                 break
 
             # ── pair 선택 ───────────────────────────────────────────────
-            # Fast path: argmax/argmin MVP. blocked 면 slow path 로.
-            g_up  = np.where(up_mask,  g, -np.inf)
-            g_low = np.where(low_mask, g, +np.inf)
-            i = int(np.argmax(g_up))
-            j = int(np.argmin(g_low))
+            g_up  = xp.where(up_mask,  g, float('-inf'))
+            g_low = xp.where(low_mask, g, float('+inf'))
+            i = int(xp.argmax(g_up))
+            j = int(xp.argmin(g_low))
 
             if i == j or (i, j) in blocked:
-                # Slow path: g_up 내림차순, g_low 오름차순 우선순위로
-                # blocked 가 아닌 첫 violating pair 탐색.
-                # argsort 는 N log N 이지만 stuck 케이스가 드물 가정.
-                i_order = np.argsort(-g_up)
-                j_order = np.argsort(g_low)
+                # Slow path: CPU 로 이동 후 탐색 (동기화 1회)
+                _g_up  = _to_numpy(g_up)
+                _g_low = _to_numpy(g_low)
+                i_order = np.argsort(-_g_up)
+                j_order = np.argsort(_g_low)
                 found = False
                 for ic in i_order:
-                    if g_up[ic] == -np.inf:
+                    if _g_up[ic] == float('-inf'):
                         break
                     for jc in j_order:
-                        if g_low[jc] == np.inf:
+                        if _g_low[jc] == float('+inf'):
                             break
                         if ic == jc:
                             continue
@@ -193,23 +199,21 @@ class SVDD:
                     if found:
                         break
                 if not found:
-                    # 모든 violating pair 가 blocked → 진전 불가, 정상 종료
                     break
 
-            gap = g[i] - g[j]
+            gap = float(g[i] - g[j])
             if gap < self.tol:
-                # KKT 만족 (전체 violating pair 의 최대 gap < tol)
                 break
 
-            eta = K[i, i] + K[j, j] - 2.0 * K[i, j]
+            eta = float(K[i, i] + K[j, j] - 2.0 * K[i, j])
             if eta < EPS_F32:
                 blocked.add((i, j))
                 self._c2_n_blocked_events += 1
                 continue
 
-            delta_unc = (g[i] - g[j]) / (2.0 * eta)
-            L = max(-alpha[i], alpha[j] - self.C)
-            H = min(self.C - alpha[i], alpha[j])
+            delta_unc = gap / (2.0 * eta)
+            L = max(-float(alpha[i]), float(alpha[j]) - self.C)
+            H = min(self.C - float(alpha[i]), float(alpha[j]))
             delta = float(np.clip(delta_unc, L, H))
             if abs(delta) < eps:
                 blocked.add((i, j))
@@ -218,9 +222,8 @@ class SVDD:
 
             alpha[i] += delta
             alpha[j] -= delta
-            f += delta * (K[i] - K[j])       # 한 행만 갱신
+            f += delta * (K[i] - K[j])       # GPU: 한 행만 갱신
 
-            # 진전 발생: box / eta 가 다 바뀌었으니 blocked 재시도 허용
             if blocked:
                 blocked.clear()
                 self._c2_n_progress_resets += 1
@@ -232,44 +235,41 @@ class SVDD:
         self.X_sv = X[sv_mask].copy()
         self.alpha = alpha[sv_mask].copy()
 
-        # 추론 시 재사용할 상수
+        # 추론 시 재사용할 상수 (Python float 으로 저장)
         K_sv = self.kernel(self.X_sv, self.X_sv)
-        self._center_norm_sq = np.float32(self.alpha @ K_sv @ self.alpha)
+        self._center_norm_sq = float(self.alpha @ K_sv @ self.alpha)
 
-        # R² fallback 3-tier (svdd.py 에서는 X_sv 가 이미 α>eps 만 보관하므로
-        # Tier 2 mask(alpha > eps)가 전체 SV 를 선택 → Tier 1 비면 Tier 2 가 outlier max 를 반환.
-        # OnlineSVDD 에서는 버퍼에 α=0 슬롯이 있어 Tier 2 mask 가 빈 슬롯을 걸러내는 역할도 함.)
         d2_all = self._distance_sq(self.X_sv)
         self.R2 = _compute_R2(d2_all, self.alpha, self.C, eps=eps)
 
         return self
 
     # ----------------------------------------------------------- distance ---
-    def _distance_sq(self, X: np.ndarray) -> np.ndarray:
-        """d²(x) = K(x,x) - 2 Σ α_i K(x, x_i) + α^T K_sv α."""
+    def _distance_sq(self, X):
+        """d²(x) = K(x,x) - 2 Σ α_i K(x, x_i) + α^T K_sv α — GPU 배열 반환."""
         K_xs = self.kernel(X, self.X_sv)
         K_xx = self.kernel.diag(X)
-        return K_xx - np.float32(2.0) * (K_xs @ self.alpha) + self._center_norm_sq
+        return K_xx - 2.0 * (K_xs @ self.alpha) + self._center_norm_sq
 
-    def distance(self, X: np.ndarray) -> np.ndarray:
-        """d(x) = sqrt(d²(x)). 거리 분포 진단 및 산출물 저장에서 raw d 값 노출용."""
+    def distance(self, X) -> np.ndarray:
+        """d(x) = sqrt(d²(x)) — numpy 배열 반환."""
         if self.X_sv is None:
             raise RuntimeError("SVDD is not fitted")
-        X = np.asarray(X, dtype=np.float32)
+        X = xp.asarray(X, dtype=xp.float32)
         if X.ndim != 2:
             raise ValueError(f"X must be 2-D, got shape {X.shape}")
-        return np.sqrt(np.maximum(self._distance_sq(X), 0.0))
+        return _to_numpy(xp.sqrt(xp.maximum(self._distance_sq(X), 0.0)))
 
-    def decision_function(self, X: np.ndarray) -> np.ndarray:
-        """R² - d²(x).  ≥ 0: 정상, < 0: 이상 (sklearn 부호 규약)."""
+    def decision_function(self, X) -> np.ndarray:
+        """R² - d²(x).  ≥ 0: 정상, < 0: 이상 (sklearn 부호 규약) — numpy 배열 반환."""
         if self.X_sv is None:
             raise RuntimeError("SVDD is not fitted")
-        X = np.asarray(X, dtype=np.float32)
+        X = xp.asarray(X, dtype=xp.float32)
         if X.ndim != 2:
             raise ValueError(f"X must be 2-D, got shape {X.shape}")
-        return self.R2 - self._distance_sq(X)
+        return _to_numpy(self.R2 - self._distance_sq(X))
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X) -> np.ndarray:
         """+1: 정상, -1: 이상."""
         return np.where(self.decision_function(X) >= 0, 1, -1)
 
@@ -286,10 +286,14 @@ class SVDD:
             "max_iter": self.max_iter,
             "tol": self.tol,
             "R2": self.R2,
-            "center_norm_sq": float(self._center_norm_sq),  # np.float32 → JSON 호환
+            "center_norm_sq": float(self._center_norm_sq),
             "n_iter_": self.n_iter_,
         }
-        np.savez(path.with_suffix(".npz"), X_sv=self.X_sv, alpha=self.alpha)
+        np.savez(
+            path.with_suffix(".npz"),
+            X_sv=_to_numpy(self.X_sv),
+            alpha=_to_numpy(self.alpha),
+        )
         with open(path.with_suffix(".json"), "w") as fp:
             json.dump(meta, fp, indent=2)
 
@@ -302,10 +306,10 @@ class SVDD:
         from .kernels import create_kernel
         kernel = create_kernel(meta["kernel"])
         obj = cls(kernel=kernel, C=meta["C"], max_iter=meta["max_iter"], tol=meta["tol"])
-        obj.X_sv = data["X_sv"].astype(np.float32)
-        obj.alpha = data["alpha"].astype(np.float32)
+        obj.X_sv = xp.asarray(data["X_sv"].astype(np.float32))
+        obj.alpha = xp.asarray(data["alpha"].astype(np.float32))
         obj.R2 = float(meta["R2"])
-        obj._center_norm_sq = np.float32(meta["center_norm_sq"])
+        obj._center_norm_sq = float(meta["center_norm_sq"])
         obj.n_iter_ = int(meta.get("n_iter_", 0))
         return obj
 
@@ -335,7 +339,7 @@ if __name__ == "__main__":
 
     gamma = 0.5
     C = 0.05
-    nu = 1.0 / (C * n_normal)              # SVDD ↔ ν-OCSVM 관계: ν = 1 / (C·N)
+    nu = 1.0 / (C * n_normal)
 
     print("===== SVDD sanity check =====")
     print(f"n_train={n_normal}, n_test_anom={n_anom}, gamma={gamma}, C={C}, nu(equiv)={nu:.3f}")
@@ -343,11 +347,11 @@ if __name__ == "__main__":
     # ----- our SVDD -----
     svdd = SVDD(kernel=RBFKernel(gamma=gamma), C=C, max_iter=2000, tol=1e-4)
     svdd.fit(X_train)
-    score_ours = svdd.decision_function(X_test)
+    score_ours = svdd.decision_function(X_test)   # numpy 반환
     auc_ours = roc_auc_score((y_test == 1).astype(int), score_ours)
 
     print(f"\n[ours]    n_iter={svdd.n_iter_}, n_sv={len(svdd.alpha)}, "
-          f"R²={svdd.R2:.4f}, α range=[{svdd.alpha.min():.4f}, {svdd.alpha.max():.4f}]")
+          f"R²={svdd.R2:.4f}, α range=[{float(svdd.alpha.min()):.4f}, {float(svdd.alpha.max()):.4f}]")
     print(f"          AUROC = {auc_ours:.4f}")
 
     # ----- sklearn OneClassSVM -----
@@ -358,7 +362,7 @@ if __name__ == "__main__":
 
     print(f"\n[sklearn] n_sv={len(ocsvm.support_)}, AUROC = {auc_sk:.4f}")
 
-    # ----- compare: SV 개수 + Spearman ρ on decision_function -----
+    # ----- compare -----
     def spearman_rho(a: np.ndarray, b: np.ndarray) -> float:
         ra = np.argsort(np.argsort(a)).astype(float)
         rb = np.argsort(np.argsort(b)).astype(float)
@@ -387,13 +391,10 @@ if __name__ == "__main__":
     # =========== C3: R² fallback 3-tier 극단 케이스 검증 =====================
     print("\n===== C3: R² fallback 3-tier checks =====")
 
-    # ---- (a) margin SV 비는 극단: C 매우 작으면 모든 SV 가 upper bound (α=C) ----
-    # C*N ≥ 1 만족시키되 가능한 한 작게 → 거의 모든 SV 가 α=C 로 saturate.
-    C_tiny = 1.0 / n_normal           # = 1/N → 모든 α = 1/N = C (corner case)
+    C_tiny = 1.0 / n_normal
     svdd_tiny = SVDD(kernel=RBFKernel(gamma=gamma), C=C_tiny, max_iter=2000, tol=1e-4)
     svdd_tiny.fit(X_train)
 
-    # 각 분기 트리거 확인용 마스크 (svdd 학습 결과 기준)
     eps = 1e-10
     a_t = svdd_tiny.alpha
     margin_t = (a_t > eps) & (a_t < svdd_tiny.C - eps)
@@ -402,46 +403,38 @@ if __name__ == "__main__":
     print(f"[tiny C={C_tiny:.4g}] n_sv={len(a_t)}, margin SV count={int(margin_t.sum())}, "
           f"non-outlier count={int(nonout_t.sum())}, R²={svdd_tiny.R2:.4f}")
     assert not np.isnan(svdd_tiny.R2), "R² is NaN under tiny C"
-    # R² 가 train d² 의 [min, max] 범위 안 (quantile 95% 는 max 보다 작거나 같음)
-    d2_min, d2_max = float(d2_all_t.min()), float(d2_all_t.max())
+    d2_min = float(d2_all_t.min())
+    d2_max = float(d2_all_t.max())
     assert d2_min - 1e-9 <= svdd_tiny.R2 <= d2_max + 1e-9, (
         f"R²={svdd_tiny.R2} outside [d²_min={d2_min}, d²_max={d2_max}]"
     )
 
-    # 모든 α=C (outlier) 케이스: Tier 1 비어 Tier 2 (active max) 발동.
-    # Tier 2 = α > eps 이므로 α=C 도 포함 — max(d²) 반환.
-    a_forced = np.full_like(a_t, svdd_tiny.C)
-    a_forced = a_forced / a_forced.sum()  # Σα=1 유지
-    a_forced = np.minimum(a_forced, svdd_tiny.C)
+    a_forced = xp.full_like(a_t, svdd_tiny.C)
+    a_forced = a_forced / a_forced.sum()
+    a_forced = xp.minimum(a_forced, svdd_tiny.C)
     d2_forced = svdd_tiny._distance_sq(svdd_tiny.X_sv)
     r2_all_outlier = _compute_R2(d2_forced, a_forced, svdd_tiny.C, eps=eps)
     max_d2 = float(d2_forced[a_forced > eps].max())
     print(f"[all α=C → Tier 2] R²={r2_all_outlier:.6f}, max(active d²)={max_d2:.6f}")
     assert abs(r2_all_outlier - max_d2) < 1e-6, "all-α=C must use Tier 2 (max of active d²)"
 
-    # Tier 3: 모든 α=0 → 95-quantile fallback.
-    a_all_zero = np.zeros_like(a_forced)
+    a_all_zero = xp.zeros_like(a_forced)
     r2_t3 = _compute_R2(d2_forced, a_all_zero, svdd_tiny.C, eps=eps)
-    q95 = float(np.quantile(d2_forced, 0.95))
+    q95 = float(xp.quantile(d2_forced, 0.95))
     print(f"[Tier 3 / all α=0] R²={r2_t3:.6f}, 95-quantile(d²)={q95:.6f}")
     assert abs(r2_t3 - q95) < 1e-6, "Tier 3 must use 95-quantile"
 
-    # ---- (b) margin SV 만 있는 정상 케이스 — _compute_R2 가 평균을 쓰는지 단독 검증 ----
-    a_margin = np.array([0.1, 0.2, 0.3, 0.4])
-    d2_margin = np.array([1.0, 2.0, 3.0, 4.0])
+    a_margin = xp.array([0.1, 0.2, 0.3, 0.4])
+    d2_margin = xp.array([1.0, 2.0, 3.0, 4.0])
     r2_t1 = _compute_R2(d2_margin, a_margin, C=1.0, eps=eps)
-    assert abs(r2_t1 - d2_margin.mean()) < 1e-12, "Tier 1 must be mean of margin d²"
-    print(f"[Tier 1 unit ] mean(d²)={d2_margin.mean():.4f}, R²={r2_t1:.4f}  OK")
+    assert abs(r2_t1 - float(d2_margin.mean())) < 1e-12, "Tier 1 must be mean of margin d²"
+    print(f"[Tier 1 unit ] mean(d²)={float(d2_margin.mean()):.4f}, R²={r2_t1:.4f}  OK")
 
-    # ---- (c) α=0 빈 슬롯이 R² 를 오염시키지 않는지 검증 ----
-    # α=0 두 개 (d²=9.0, 9.5, 큰 값) + α=C outlier 두 개 (d²=1.0, 2.5, 작은 값).
-    # Tier 2 active_mask = α > eps → α=0 슬롯 제외 → max(d²[active]) = max(1.0, 2.5) = 2.5.
-    # 과거 버그(Tier 2 가 α=0 슬롯 포함)에서는 R²=9.5 가 반환됐음.
     C_unit = 0.5
-    a_t2 = np.array([0.0, 0.0, 0.5, 0.5])         # 두 슬롯 α=0 (큰 d²), 두 슬롯 α=C
-    d2_t2 = np.array([9.0, 9.5, 1.0, 2.5])          # α=0 슬롯이 더 큰 d² 를 가짐
+    a_t2 = xp.array([0.0, 0.0, 0.5, 0.5])
+    d2_t2 = xp.array([9.0, 9.5, 1.0, 2.5])
     r2_t2 = _compute_R2(d2_t2, a_t2, C=C_unit, eps=eps)
-    expected_tier2 = float(d2_t2[a_t2 > eps].max())  # Tier 2: active SV 의 max
+    expected_tier2 = float(d2_t2[a_t2 > eps].max())
     assert abs(r2_t2 - expected_tier2) < 1e-12, (
         f"α=0 slot must not enter Tier 2 max (expect {expected_tier2}): got {r2_t2}"
     )
@@ -452,20 +445,18 @@ if __name__ == "__main__":
     # =========== C2: SMO outer-loop pair-masking 검증 =======================
     print("\n===== C2: SMO outer-loop pair-masking checks =====")
 
-    # ---- (d) 극단 케이스: gamma 큼 + C 작음 → eta≈0 / box-clip 빈번 ----
-    gamma_x, C_x = 1e3, 1.0 / n_normal     # 극단 hyperparam
+    gamma_x, C_x = 1e3, 1.0 / n_normal
     svdd_x = SVDD(kernel=RBFKernel(gamma=gamma_x), C=C_x, max_iter=2000, tol=1e-4)
     svdd_x.fit(X_train)
     eps_x = 1e-10
-    # SV 내부에서 잔여 KKT gap 측정 — 학습 후 진정한 violation 신호
     a_x = svdd_x.alpha
     up_x  = a_x < svdd_x.C - eps_x
     low_x = a_x > eps_x
     K_sv  = svdd_x.kernel(svdd_x.X_sv, svdd_x.X_sv)
     g_sv  = svdd_x.kernel.diag(svdd_x.X_sv) - 2.0 * (K_sv @ a_x)
     if up_x.any() and low_x.any():
-        kkt_gap = float(np.max(np.where(up_x, g_sv, -np.inf))
-                        - np.min(np.where(low_x, g_sv, +np.inf)))
+        kkt_gap = float(xp.max(xp.where(up_x, g_sv, float('-inf')))
+                        - xp.min(xp.where(low_x, g_sv, float('+inf'))))
     else:
         kkt_gap = 0.0
     print(f"[extreme] gamma={gamma_x}, C={C_x:.4g}, max_iter=2000")
@@ -476,10 +467,7 @@ if __name__ == "__main__":
     assert svdd_x.n_iter_ <= 2000, "max_iter 초과 — 무한루프"
     assert not np.isnan(svdd_x.R2), "R² NaN"
 
-    # ---- (d2) 중복점이 있는 데이터: η = 0 으로 blocked-pair 경로 강제 발동 ----
-    # K_dup-dup 가 K_dup-dup 자기 자신과 동일 → eta = 0. 기존 코드라면
-    # 첫 막힘에서 break 했을 케이스. 신 코드는 mask 후 다른 페어로 진행해야 함.
-    X_dup = np.vstack([X_normal, X_normal[:40]])  # 40 개 중복 추가
+    X_dup = np.vstack([X_normal, X_normal[:40]])
     svdd_d = SVDD(kernel=RBFKernel(gamma=gamma), C=C, max_iter=2000, tol=1e-4)
     svdd_d.fit(X_dup)
     print(f"[duplicates] N={len(X_dup)}, n_iter={svdd_d.n_iter_}, n_sv={len(svdd_d.alpha)}, "
@@ -489,7 +477,6 @@ if __name__ == "__main__":
     assert svdd_d.n_iter_ <= 2000, "중복점 데이터에서 max_iter 초과"
     assert not np.isnan(svdd_d.R2), "R² NaN under duplicates"
 
-    # 사후 KKT gap 측정 — 신 코드는 진전 가능 페어가 있는 한 끝까지 가야 함
     a_d = svdd_d.alpha
     eps_d = 1e-10
     up_d  = a_d < svdd_d.C - eps_d
@@ -497,15 +484,12 @@ if __name__ == "__main__":
     K_sv_d = svdd_d.kernel(svdd_d.X_sv, svdd_d.X_sv)
     g_d    = svdd_d.kernel.diag(svdd_d.X_sv) - 2.0 * (K_sv_d @ a_d)
     if up_d.any() and low_d.any():
-        kkt_gap_d = float(np.max(np.where(up_d, g_d, -np.inf))
-                          - np.min(np.where(low_d, g_d, +np.inf)))
+        kkt_gap_d = float(xp.max(xp.where(up_d, g_d, float('-inf')))
+                          - xp.min(xp.where(low_d, g_d, float('+inf'))))
     else:
         kkt_gap_d = 0.0
     print(f"             KKT gap (post)={kkt_gap_d:.4e}  (expect ≤ tol or progress saturated)")
 
-    # ---- (e) 정상 케이스 (gamma=0.5, C=0.05) blocked_events 모니터링 ----
-    # 이미 sklearn 비교를 통과한 모델이라 KKT 는 신뢰. blocked_events 가
-    # n_iter 와 같다면 진전 없는 의심 — assert.
     assert svdd._c2_n_blocked_events == 0 or svdd._c2_n_blocked_events < svdd.n_iter_, (
         "정상 케이스에서 blocked_events 가 n_iter 만큼 누적 — 진전 없는 의심"
     )

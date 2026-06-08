@@ -1,5 +1,6 @@
 # Core Data Science / ML
 numpy==2.2.6
+cupy-cuda12x>=14.0  # GPU acceleration (falls back to numpy if unavailable)
 pandas==2.3.3
 scipy==1.15.3
 scikit-learn==1.7.2

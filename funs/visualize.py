@@ -20,7 +20,7 @@ from sklearn.manifold import TSNE
 
 # ── analysis 공용 상수 ────────────────────────────────────────────────────────
 
-PREP_ORDER   = ["p1_raw", "p2_fft", "p3_envspec", "p4_cepstrum", "p5_order", "p6_tds"]
+PREP_ORDER   = ["p1_raw", "p2_fft", "p3_envspec", "p4_cepstrum", "p5_order", "p6_tds", "p7_orderspec"]
 DATASET_ORDER = ["cwru", "pu", "uos"]
 KERNELS      = ("rbf", "linear")
 
@@ -31,8 +31,9 @@ _PREP_LABEL = {
     "p3_envspec":  "Envelope",
     "p4_cepstrum": "Cepstrum",
     "p5_order":    "Order",
-    "p6_tds":      "TDS",
-    "p6_stat":     "TDS",
+    "p6_tds":        "TDS",
+    "p6_stat":       "TDS",
+    "p7_orderspec":  "Order Spec",
 }
 
 _GROUP_LABEL = {

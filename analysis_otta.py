@@ -359,9 +359,10 @@ def plot_baseline_vs_otta(
     return m
 
 
-_PREP_ORDER = ("p1_raw", "p3_envspec", "p4_cepstrum", "p6_tds")
+_PREP_ORDER = ("p1_raw", "p3_envspec", "p4_cepstrum", "p6_tds", "p7_orderspec")
 _PREP_LABEL = {"p1_raw": "Raw", "p3_envspec": "Envelope Spectrum",
-               "p4_cepstrum": "Cepstrum", "p6_tds": "TDS"}
+               "p4_cepstrum": "Cepstrum", "p6_tds": "TDS",
+               "p7_orderspec": "Order Spec"}
 _KERNEL_LABEL = {"rbf": "RBF", "linear": "Linear", "poly": "Poly"}
 
 
@@ -413,8 +414,11 @@ def plot_R_trace_by_scenario(
         sc_label = _scenario_label(dataset, scenario_id, rpm_domain_map)
         kernel_label = _KERNEL_LABEL.get(kernel, kernel.upper())
 
-        fig, axes = plt.subplots(2, 2, figsize=(11, 7), sharex=False)
-        axes_flat = axes.flatten()
+        n_plots = len(preps_present)
+        n_cols = min(n_plots, 3)
+        n_rows = (n_plots + n_cols - 1) // n_cols
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(5.5 * n_cols, 3.5 * n_rows), sharex=False)
+        axes_flat = np.array(axes).flatten()
 
         # warmup N은 첫 prep에서 한 번만 읽음 (시나리오 내 공통값)
         n_warmup = 0
