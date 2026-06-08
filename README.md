@@ -18,39 +18,29 @@ python main.py --out-dir <결과_디렉토리_경로>
 
 예시:
 ```bash
-python main.py --out-dir ./results/0607/linear
+python main.py --out-dir ./results/0607
 ```
 
 옵션:
 
 | 옵션 | 기본값 | 설명 |
 |------|--------|------|
-| `--out-dir` | (필수) | 실험 결과 저장 경로 (예: `./results/0607/linear`) |
+| `--out-dir` | (필수) | 실험 결과 저장 경로 (예: `./results/0607`) |
 | `--workers` | `8` | 병렬 시나리오 수 |
 | `--otta-mode` | `dual_boundary` | OTTA 모드 (`dual_boundary`, `single_boundary`) |
 
-로그는 `log/run_<timestamp>.log`에 저장됩니다.
+로그는 `log/run_<timestamp>.log`에 저장
 
----
 
-### 개별 실행
+## 전처리
 
-**실험만:**
-```bash
-python run.py --out-dir ./results/0607/linear --workers 8
-python run.py --source A --target B  # 특정 시나리오
-```
-
-**분석만:**
-```bash
-python analysis.py --results-root ./results/0607
-python analysis_otta.py --results-root ./results/0607
-```
+Cepstrum (`p4_cepstrum`) 단일 사용.  
+raw window → per-window z-score → real cepstrum → liftering (64 bins)
 
 ## 결과 구조
 
 ```
-results/<date>/linear/cwru/<scenario_id>/<prep_id>/
+results/<date>/cwru/<scenario_id>/p4_cepstrum/
     otta_stream.npz
     distances.npz
     metrics.json

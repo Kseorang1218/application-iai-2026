@@ -360,10 +360,8 @@ def plot_baseline_vs_otta(
     return m
 
 
-_PREP_ORDER = ("p1_raw", "p3_envspec", "p4_cepstrum", "p6_tds", "p7_orderspec")
-_PREP_LABEL = {"p1_raw": "Raw", "p3_envspec": "Envelope Spectrum",
-               "p4_cepstrum": "Cepstrum", "p6_tds": "TDS",
-               "p7_orderspec": "Order Spec"}
+_PREP_ORDER = ("p4_cepstrum",)
+_PREP_LABEL = {"p4_cepstrum": "Cepstrum"}
 _KERNEL_LABEL = {"rbf": "RBF", "linear": "Linear", "poly": "Poly"}
 
 

@@ -1,10 +1,10 @@
 """Main Experiment Runner — DualBoundarySVDD 기반 Online Test-Time Adaptation.
 
-목적: 4 전처리 (raw, env_spec, cepstrum, tds) × 44 시나리오에 대해
-source domain에서 DualBoundarySVDD를 pre-train한 뒤, target stream을
-1-sample씩 순차 처리하며 selective adaptation을 수행한다.
+목적: cepstrum 전처리 × 44 시나리오에 대해 source domain에서
+DualBoundarySVDD를 pre-train한 뒤, target stream을 1-sample씩 순차
+처리하며 selective adaptation을 수행한다.
 
-산출물 디렉토리: `results/{date}/linear/cwru/{scenario_id}/{prep_id}/`
+산출물 디렉토리: `results/{date}/cwru/{scenario_id}/{prep_id}/`
 """
 import contextlib
 import io
@@ -19,7 +19,6 @@ _root = pathlib.Path(__file__).parent
 def run_scenario(
     config,
     df,
-    fs: float,
     source_rpm: int,
     target_rpm: int,
     source_key: str,
@@ -27,7 +26,7 @@ def run_scenario(
     results_root: pathlib.Path,
     otta_mode: str = "dual_boundary",
 ) -> list[dict]:
-    """한 (source, target) 시나리오에 대해 5 전처리 모두 실행."""
+    """한 (source, target) 시나리오에 대해 cepstrum 전처리 실행."""
     ws = int(config["window_size"])
     seed = config['seed']
     scenario_id = f"{source_rpm}_to_{target_rpm}"
@@ -54,34 +53,13 @@ def run_scenario(
         source_val_normal, window_size=ws, stride=ws,
     )
 
-    # ----- Feature 추출 공통 파라미터 -----
+    # ----- Feature 추출 -----
     lifter_n = int(config['cepstrum_lifter_n'])
-    bandpass = config.get("env_spec_bandpass", "auto")
-    if bandpass == "auto" or bandpass is None:
-        bandpass = "auto"
+    feature_fns = funs.make_feature_fns(lifter_n=lifter_n)
 
-    _osp_cfg = dict(config.get("order_spec_params", {}))
-    n_revs = _osp_cfg.pop("n_revs", None)
-    order_params = {**_osp_cfg, "n_revs": n_revs}
-
-    # source/target 도메인은 RPM이 다르므로 별도 feature_fns 생성
-    feature_fns_src = funs.make_feature_fns(
-        fs, lifter_n=lifter_n, log1p=False, bandpass=bandpass,
-        rpm=source_rpm, order_spec_params=order_params,
-    )
-    feature_fns_tgt = funs.make_feature_fns(
-        fs, lifter_n=lifter_n, log1p=False, bandpass=bandpass,
-        rpm=target_rpm, order_spec_params=order_params,
-    )
-
-    # ----- Source feature 추출 (batch OK; SVDD pre-train) -----
-    S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns_src.items()}
-
-    # ----- Source validation feature 추출 (동일 파이프라인 적용) -----
-    S_val_feats = {k: fn(S_X_val) for k, fn in feature_fns_src.items()}
-
-    # ----- Target stream feature 추출 (window 1개씩 — OTTA 전제) -----
-    T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns_tgt)
+    S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns.items()}
+    S_val_feats   = {k: fn(S_X_val)   for k, fn in feature_fns.items()}
+    T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns)
 
     # ----- Per-preprocessing OTTA run -----
     print(f"\n[{scenario_label}] running {len(config['preprocessing_ids'])} preprocessings → {scenario_dir}")
@@ -154,7 +132,6 @@ def run_experiment(
 ) -> None:
     config = funs.get_config()
     domain_dict = dict(config["domain"])
-    fs = config["sampling_rate"]
     valid_keys = list(domain_dict.keys())
 
     if source and source not in domain_dict:
@@ -182,7 +159,7 @@ def run_experiment(
 
     job_kwargs = [
         dict(
-            config=config, df=df, fs=fs,
+            config=config, df=df,
             source_rpm=domain_dict[s_key], target_rpm=domain_dict[t_key],
             source_key=s_key, target_key=t_key,
             results_root=results_root,

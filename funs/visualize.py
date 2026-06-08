@@ -390,7 +390,8 @@ def plot_dual_boundary_polar(
         # subplot cell width ≈ figure_width * (right-left) / (n_cols + (n_cols-1)*wspace)
         # figsize height is set so each subplot cell is square → no whitespace from aspect='equal'
         _n_cols    = len(_preps)
-        _fig_w     = 2.5 * _n_cols
+        _cell_min  = 6.0   # minimum cell width in inches (ensures circle is large enough)
+        _fig_w     = _cell_min * _n_cols
         _wspace    = 0.05
         _cell_w    = _fig_w * (0.99 - 0.08) / (_n_cols + (_n_cols - 1) * _wspace)
         _margin_h  = 1.95   # inches: suptitle + col-headers (top) + legend (bottom)
@@ -562,8 +563,17 @@ def plot_cm_by_dataset(
             continue
 
         n = len(prep_order_local)
-        fig, axes = plt.subplots(2, 2, figsize=(8, 7))
-        axes_flat = axes.flatten()
+        if n == 1:
+            fig, _ax = plt.subplots(1, 1, figsize=(6.5, 5.5))
+            axes_flat = [_ax]
+        elif n <= 2:
+            fig, _axes = plt.subplots(1, n, figsize=(6.5 * n, 5.5))
+            axes_flat = list(np.array(_axes).flatten())
+        else:
+            _nc = 2
+            _nr = (n + 1) // 2
+            fig, _axes = plt.subplots(_nr, _nc, figsize=(10, 5 * _nr))
+            axes_flat = list(_axes.flatten())
 
         for ax, prep in zip(axes_flat, prep_order_local):
             row = sub[sub[col_prep] == prep]
@@ -604,3 +614,117 @@ def plot_cm_by_dataset(
         fig.savefig(out_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
         print(f"[analysis] saved {out_path}")
+
+
+def plot_dual_boundary_polar_grid(
+    results_root: pathlib.Path,
+    kernel: str,
+    scenarios: list[tuple[str, str]],
+    out_path: pathlib.Path,
+    prep: str = "p4_cepstrum",
+    r_inner_pct: float = 50,
+    r_outer_pct: float = 95,
+    max_per_group: int = 300,
+    seed: int = 42,
+    zoom_factor: float = 1.3,
+    rpm_domain_map: dict | None = None,
+) -> None:
+    """전 시나리오를 단일 그리드 이미지로 통합 — analysis/{kernel}/dual_boundary_polar.png용.
+
+    CWRU 기준 4 source × 3 target = 12 시나리오를 4행 3열로 배치.
+    distances.npz (pre-train) 사용. 시나리오 라벨(A→B)을 subplot title로 표시.
+    """
+    from collections import defaultdict
+
+    results_root = pathlib.Path(results_root)
+    rng = np.random.default_rng(seed)
+
+    group_style = {
+        "source_train":  {"color": "#1f77b4", "alpha": 0.22},
+        "target_normal": {"color": "#ff7f0e", "alpha": 0.55},
+        "target_fault":  {"color": "#d62728", "alpha": 0.55},
+    }
+
+    def _sc_label(dataset: str, scenario_id: str) -> str:
+        if rpm_domain_map is None:
+            return scenario_id
+        ds_map = rpm_domain_map.get(dataset, {})
+        try:
+            s, t = scenario_id.split("_to_")
+            return f"{ds_map.get(int(s), s)}→{ds_map.get(int(t), t)}"
+        except ValueError:
+            return scenario_id
+
+    # 시나리오를 source RPM별로 그룹화
+    src_groups: dict[int, list[tuple[str, str, int]]] = defaultdict(list)
+    for dataset, scenario_id in scenarios:
+        try:
+            src_str, tgt_str = scenario_id.split("_to_")
+            src_groups[int(src_str)].append((dataset, scenario_id, int(tgt_str)))
+        except ValueError:
+            continue
+
+    sorted_srcs = sorted(src_groups.keys())
+    n_rows = len(sorted_srcs)
+    n_cols = max(len(v) for v in src_groups.values())
+
+    _cell = 4.5
+    _fig_w = _cell * n_cols
+    _fig_h = _cell * n_rows + 2.5
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(_fig_w, _fig_h), squeeze=False)
+
+    all_handles: list = []
+    all_labels: list[str] = []
+
+    for r, src_rpm in enumerate(sorted_srcs):
+        runs = sorted(src_groups[src_rpm], key=lambda x: x[2])
+        for c in range(n_cols):
+            ax = axes[r, c]
+            if c >= len(runs):
+                ax.set_axis_off()
+                continue
+            dataset, scenario_id, _ = runs[c]
+            npz_path = results_root / dataset / scenario_id / prep / "distances.npz"
+            ok = _draw_one_polar_ax(
+                ax, npz_path, prep,
+                r_inner_pct, r_outer_pct,
+                rng, max_per_group, group_style,
+                show_title=False,
+                zoom_factor=zoom_factor,
+            )
+            ax.set_title(_sc_label(dataset, scenario_id), fontsize=13, pad=6)
+            if ok and not all_handles:
+                all_handles, all_labels = ax.get_legend_handles_labels()
+
+    seen: set[str] = set()
+    unique = []
+    for h, l in zip(all_handles, all_labels):
+        if l not in seen:
+            seen.add(l)
+            unique.append((h, l))
+
+    fig.suptitle(
+        f"DualBoundary SVDD — {kernel.upper()} Kernel  |  Pre-train distances",
+        fontsize=16, y=0.99,
+    )
+
+    _legend_y = 0.5 / _fig_h
+    if unique:
+        fig.legend(
+            *zip(*unique), loc="upper center", ncol=3,
+            fontsize=13, bbox_to_anchor=(0.5, _legend_y + 0.06),
+            frameon=False, markerscale=3.0,
+        )
+
+    fig.subplots_adjust(
+        top=1.0 - 1.2 / _fig_h,
+        bottom=_legend_y + 0.09,
+        left=0.04, right=0.99,
+        hspace=0.22, wspace=0.08,
+    )
+
+    out_path = pathlib.Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"[polar_grid] {len(scenarios)} scenarios → {out_path}")

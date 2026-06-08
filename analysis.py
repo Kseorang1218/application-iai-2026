@@ -57,12 +57,14 @@ from funs.evaluation import (
 from funs.visualize import (
     plot_cm_by_dataset,
     plot_dual_boundary_polar,
+    plot_dual_boundary_polar_grid,
     plot_tradeoff_csv,
 )
 
 def _discover_scenarios(results_root: pathlib.Path, kernel: str) -> list[tuple[str, str]]:
     """results_root/{kernel}/{dataset}/{scenario_id}/ 구조에서 모든 시나리오 탐색.
-    커널 서브디렉토리가 없으면 results_root 자체를 탐색."""
+    커널 서브디렉토리가 없으면 results_root 자체를 탐색.
+    scenario_id 는 '{rpm}_to_{rpm}' 형태인 것만 포함 (analysis/, evaluation/ 등 배제)."""
     kernel_root = _kernel_root(results_root, kernel)
     pairs: list[tuple[str, str]] = []
     if not kernel_root.exists():
@@ -72,6 +74,8 @@ def _discover_scenarios(results_root: pathlib.Path, kernel: str) -> list[tuple[s
             continue
         for scenario_dir in sorted(dataset_dir.iterdir()):
             if not scenario_dir.is_dir():
+                continue
+            if "_to_" not in scenario_dir.name:
                 continue
             pairs.append((dataset_dir.name, scenario_dir.name))
     return pairs
@@ -151,6 +155,18 @@ def run_analysis(
         if scenarios:
             print(f"\n[dual_boundary] {kernel}: {len(scenarios)} scenarios")
             plot_dual_boundary_polar(_kernel_root(results_root, kernel), kernel, scenarios, prep_order=preps)
+
+    # ── Step 6b (per-kernel): 전 시나리오 통합 polar grid → analysis/{kernel}/dual_boundary_polar.png
+    for kernel in kernels:
+        scenarios = _discover_scenarios(results_root, kernel)
+        if scenarios and preps:
+            (analysis_dir / kernel).mkdir(parents=True, exist_ok=True)
+            plot_dual_boundary_polar_grid(
+                _kernel_root(results_root, kernel), kernel, scenarios,
+                out_path=analysis_dir / kernel / "dual_boundary_polar.png",
+                prep=preps[0],
+                rpm_domain_map=rpm_to_domain,
+            )
 
     # ── Step 7 (cross-kernel): distances.npz → analysis/distance_ratio_summary.csv
     summarize_distance_ratios(results_root, analysis_dir, rpm_to_domain=rpm_to_domain)

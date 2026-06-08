@@ -10,20 +10,8 @@ _CONFIG: dict = {
 
     "window_size": 2048,
 
-    "env_spec_bandpass": [2000, 5900],
-
-    "order_spec_params": {
-        "samples_per_rev": 64,
-        "max_order": 20.0,
-        "n_revs": 4,
-    },
-
     "preprocessing_ids": {
-        "raw":        "p1_raw",
-        "env_spec":   "p3_envspec",
-        "cepstrum":   "p4_cepstrum",
-        "tds":        "p6_tds",
-        "order_spec": "p7_orderspec",
+        "cepstrum": "p4_cepstrum",
     },
     "cepstrum_lifter_n": 64,
     "svdd_nu":       0.1,
