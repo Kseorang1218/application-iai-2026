@@ -40,16 +40,8 @@ class _Tee:
 def main() -> None:
     parser = argparse.ArgumentParser(description="전체 실험 파이프라인")
     parser.add_argument(
-        "--date", required=True, metavar="DIR",
-        help="결과 저장 디렉토리명 (예: 0607 → results/0607/)",
-    )
-    parser.add_argument(
-        "--kernel", default="linear", choices=["linear", "rbf", "poly"],
-        help="SVDD 커널 (기본값: linear)",
-    )
-    parser.add_argument(
-        "--dataset", default="cwru", choices=["cwru"],
-        help="데이터셋 (기본값: cwru)",
+        "--out-dir", required=True, metavar="DIR",
+        help="실험 결과 저장 경로 (예: ./results/0607/linear)",
     )
     parser.add_argument(
         "--workers", type=int, default=8, metavar="N",
@@ -67,8 +59,8 @@ def main() -> None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = log_dir / f"run_{timestamp}.log"
 
-    results_root = _ROOT / "results" / args.date
-    out_dir = results_root / args.kernel
+    out_dir = pathlib.Path(args.out_dir)
+    results_root = out_dir
 
     with open(log_path, "w", encoding="utf-8") as log_file:
         tee = _Tee(sys.stdout, log_file)
@@ -78,14 +70,12 @@ def main() -> None:
         try:
             tee.write(f"로그 경로: {log_path}\n")
             tee.write(f"결과 경로: {results_root}\n")
-            tee.write(f"커널: {args.kernel} | 데이터셋: {args.dataset} | workers: {args.workers}\n\n")
+            tee.write(f"workers: {args.workers}\n\n")
 
             # ── Step 1: 실험 ───────────────────────────────────────────────
             t0 = time.time()
             tee.write(f"{'='*60}\n[Step 1] 실험 시작\n{'='*60}\n")
             run_experiment(
-                dataset=args.dataset,
-                kernel=args.kernel,
                 out_dir=str(out_dir),
                 workers=args.workers,
                 otta_mode=args.otta_mode,

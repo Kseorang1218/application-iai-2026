@@ -82,12 +82,15 @@ def evaluate_otta_performance(
 
     for stream_path in sorted(results_root.rglob("otta_stream.npz")):
         rel = stream_path.relative_to(results_root)
-        # 예상 구조: {kernel}/{dataset}/{scenario_id}/{prep_id}/otta_stream.npz
-        if len(rel.parts) < 5:
+        if len(rel.parts) == 5:
+            kernel, dataset, scenario_id, prep_id = (
+                rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
+            )
+        elif len(rel.parts) == 4:
+            kernel = "linear"
+            dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        else:
             continue
-        kernel, dataset, scenario_id, prep_id = (
-            rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
-        )
         if kernel_filter is not None and kernel != kernel_filter:
             continue
 
@@ -396,11 +399,15 @@ def plot_R_trace_by_scenario(
     groups: dict[tuple[str, str, str], list[tuple[str, pathlib.Path]]] = {}
     for stream_path in sorted(results_root.rglob("otta_stream.npz")):
         rel = stream_path.relative_to(results_root)
-        if len(rel.parts) < 5:
+        if len(rel.parts) == 5:
+            kernel, dataset, scenario_id, prep_id = (
+                rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
+            )
+        elif len(rel.parts) == 4:
+            kernel = "linear"
+            dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        else:
             continue
-        kernel, dataset, scenario_id, prep_id = (
-            rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
-        )
         groups.setdefault((kernel, dataset, scenario_id), []).append((prep_id, stream_path))
 
     for (kernel, dataset, scenario_id), runs in groups.items():
@@ -482,7 +489,8 @@ def plot_R_trace_by_scenario(
                    fontsize=11, bbox_to_anchor=(0.5, 0.95),
                    frameon=True, framealpha=0.8)
 
-        out_path = results_root / kernel / dataset / scenario_id / "R_trace.png"
+        kroot = results_root / kernel if (results_root / kernel).is_dir() else results_root
+        out_path = kroot / dataset / scenario_id / "R_trace.png"
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=120, bbox_inches="tight")
         plt.close(fig)
@@ -503,13 +511,14 @@ def run_analysis_otta(
     if kernel:
         kernels = [kernel]
     else:
-        kernels = [
-            k.name for k in sorted(results_root.iterdir())
-            if k.is_dir() and k.name in KERNELS
-        ]
+        kernels = [k.name for k in sorted(results_root.iterdir()) if k.is_dir() and k.name in KERNELS]
+        # 커널 서브디렉토리 없이 데이터가 바로 있는 경우 (flat 구조)
+        if not kernels and any(results_root.rglob("otta_stream.npz")):
+            kernels = ["linear"]
 
     for k in kernels:
-        if not (results_root / k).exists():
+        # flat 구조면 results_root 자체를 kernel root로 사용
+        if not (results_root / k).exists() and not any(results_root.rglob("otta_stream.npz")):
             print(f"[otta] {k} 폴더 없음 — skip")
             continue
 

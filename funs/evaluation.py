@@ -156,11 +156,8 @@ class AnomalyDetectionEvaluator:
 
 def build_rpm_domain_map(cfg) -> dict[str, dict[int, str]]:
     """config 에서 {dataset: {rpm: domain_key}} 역매핑 생성."""
-    result: dict[str, dict[int, str]] = {}
-    for dataset in ("cwru",):
-        domain_def = cfg.get(f"{dataset}_domain", {})
-        result[dataset] = {int(rpm): key for key, rpm in domain_def.items()}
-    return result
+    domain_def = cfg.get("domain", {})
+    return {"cwru": {int(rpm): key for key, rpm in domain_def.items()}}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -194,11 +191,15 @@ def evaluate_ad_performance(
 
     for dist_path in sorted(results_root.rglob("distances.npz")):
         rel = dist_path.relative_to(results_root)
-        if len(rel.parts) < 5:
+        if len(rel.parts) == 5:
+            kernel, dataset, scenario_id, prep_id = (
+                rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
+            )
+        elif len(rel.parts) == 4:
+            kernel = "linear"
+            dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        else:
             continue
-        kernel, dataset, scenario_id, prep_id = (
-            rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
-        )
 
         try:
             src_rpm_str, tgt_rpm_str = scenario_id.split("_to_")
@@ -305,11 +306,15 @@ def summarize_distance_ratios(
 
     for dist_path in sorted(results_root.rglob("distances.npz")):
         rel = dist_path.relative_to(results_root)
-        if len(rel.parts) < 5:
+        if len(rel.parts) == 5:
+            kernel, dataset, scenario_id, prep_id = (
+                rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
+            )
+        elif len(rel.parts) == 4:
+            kernel = "linear"
+            dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        else:
             continue
-        kernel, dataset, scenario_id, prep_id = (
-            rel.parts[0], rel.parts[1], rel.parts[2], rel.parts[3]
-        )
 
         try:
             src_rpm_str, tgt_rpm_str = scenario_id.split("_to_")

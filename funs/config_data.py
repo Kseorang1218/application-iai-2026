@@ -4,41 +4,36 @@ from box import Box
 _CONFIG: dict = {
     "seed": 42,
 
-    "cwru_domain": {"A": 1730, "B": 1750, "C": 1772, "D": 1797},
+    "domain": {"A": 1730, "B": 1750, "C": 1772, "D": 1797},
 
-    "sampling_rate": {"cwru": 12000},
+    "sampling_rate": 12000,
 
     "window_size": 2048,
-    "window_size_override": {"cwru": 2048},
 
-    "env_spec_bandpass": {"cwru": [2000, 5900]},
-
-    "dataset_overrides": {},
+    "env_spec_bandpass": [2000, 5900],
 
     "order_spec_params": {
         "samples_per_rev": 64,
         "max_order": 20.0,
-        "n_revs": {"cwru": 4},
+        "n_revs": 4,
     },
 
-    "main": {
-        "preprocessing_ids": {
-            "raw":        "p1_raw",
-            "env_spec":   "p3_envspec",
-            "cepstrum":   "p4_cepstrum",
-            "tds":        "p6_tds",
-            "order_spec": "p7_orderspec",
-        },
-        "cepstrum_lifter_n": {"cwru": 64},
-        "svdd_nu":       0.1,
-        "svdd_max_iter": 1000,
-        "svdd_tol":      0.001,
-        "no_constraint_buffer_cap": 5000,
-        "rho_inner":      0.5,
-        "rho_outer":      1.5,
-        "warmup_ratio":   0.10,
-        "max_inner_iter": 10,
+    "preprocessing_ids": {
+        "raw":        "p1_raw",
+        "env_spec":   "p3_envspec",
+        "cepstrum":   "p4_cepstrum",
+        "tds":        "p6_tds",
+        "order_spec": "p7_orderspec",
     },
+    "cepstrum_lifter_n": 64,
+    "svdd_nu":       0.1,
+    "svdd_max_iter": 1000,
+    "svdd_tol":      0.001,
+    "no_constraint_buffer_cap": 5000,
+    "rho_inner":      0.5,
+    "rho_outer":      1.5,
+    "warmup_ratio":   0.10,
+    "max_inner_iter": 10,
 }
 
 

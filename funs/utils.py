@@ -3,43 +3,9 @@ import argparse
 
 import numpy as np
 
-ALLOWED_KERNELS = ["rbf", "linear", "poly"]
-ALLOWED_DATASETS = ["cwru"]
-
-
 def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
-    """
-    CLI 인자 파싱 함수
-
-    Parameters
-    ----------
-    description : str
-        argparse parser description
-
-    Returns
-    -------
-    argparse.Namespace
-        파싱된 인자 (dataset, kernel, source, target)
-
-    Notes
-    -----
-    source / target 도메인 키의 유효성 검증은 config 로드 후 호출측에서 수행.
-    """
+    """CLI 인자 파싱. source/target 유효성 검증은 config 로드 후 호출측에서 수행."""
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        required=True,
-        choices=ALLOWED_DATASETS,
-        help="사용할 데이터셋 (cwru)",
-    )
-    parser.add_argument(
-        "--kernel",
-        type=str,
-        default="rbf",
-        choices=ALLOWED_KERNELS,
-        help="SVDD kernel type (rbf, linear, poly)",
-    )
     parser.add_argument(
         "--source",
         type=str,
@@ -78,14 +44,7 @@ def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
         metavar="N",
         help="병렬로 실행할 시나리오 수 (기본값: 1 = 순차). RPi 배포 시 반드시 1 사용.",
     )
-    args = parser.parse_args()
-
-    if args.kernel not in ALLOWED_KERNELS:
-        raise ValueError(
-            f"허용되지 않은 커널 타입입니다: {args.kernel}. (허용: {', '.join(ALLOWED_KERNELS)})"
-        )
-
-    return args
+    return parser.parse_args()
 
 
 def median_heuristic_gamma(

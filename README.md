@@ -13,21 +13,19 @@ pip install -r requirements.txt
 ### 전체 파이프라인
 
 ```bash
-python main.py --date <결과_디렉토리명>
+python main.py --out-dir <결과_디렉토리_경로>
 ```
 
 예시:
 ```bash
-python main.py --date 0607
+python main.py --out-dir ./results/0607/linear
 ```
 
 옵션:
 
 | 옵션 | 기본값 | 설명 |
 |------|--------|------|
-| `--date` | (필수) | 결과 저장 디렉토리명 (`results/<date>/`) |
-| `--kernel` | `linear` | SVDD 커널 (`linear`, `rbf`, `poly`) |
-| `--dataset` | `cwru` | 데이터셋 (`cwru`, `pu`, `uos`) |
+| `--out-dir` | (필수) | 실험 결과 저장 경로 (예: `./results/0607/linear`) |
 | `--workers` | `8` | 병렬 시나리오 수 |
 | `--otta-mode` | `dual_boundary` | OTTA 모드 (`dual_boundary`, `single_boundary`) |
 
@@ -39,8 +37,8 @@ python main.py --date 0607
 
 **실험만:**
 ```bash
-python run.py --dataset cwru --kernel linear --out-dir ./results/0607/linear --workers 8
-python run.py --dataset cwru --kernel rbf --source A --target B  # 특정 시나리오
+python run.py --out-dir ./results/0607/linear --workers 8
+python run.py --source A --target B  # 특정 시나리오
 ```
 
 **분석만:**
@@ -52,14 +50,14 @@ python analysis_otta.py --results-root ./results/0607
 ## 결과 구조
 
 ```
-results/<date>/<kernel>/<dataset>/<scenario_id>/<prep_id>/
+results/<date>/linear/cwru/<scenario_id>/<prep_id>/
     otta_stream.npz
     distances.npz
     metrics.json
 results/<date>/evaluation/
-    <kernel>/run_metrics.csv
+    linear/run_metrics.csv
     AD_performance_all.csv
-    otta_performance_all.csv (per kernel)
+    otta_performance_all.csv
 log/
     run_<timestamp>.log
 ```

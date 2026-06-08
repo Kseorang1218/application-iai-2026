@@ -61,8 +61,9 @@ from funs.visualize import (
 )
 
 def _discover_scenarios(results_root: pathlib.Path, kernel: str) -> list[tuple[str, str]]:
-    """results_root/{kernel}/{dataset}/{scenario_id}/ 구조에서 모든 시나리오 탐색."""
-    kernel_root = results_root / kernel
+    """results_root/{kernel}/{dataset}/{scenario_id}/ 구조에서 모든 시나리오 탐색.
+    커널 서브디렉토리가 없으면 results_root 자체를 탐색."""
+    kernel_root = _kernel_root(results_root, kernel)
     pairs: list[tuple[str, str]] = []
     if not kernel_root.exists():
         return pairs
@@ -77,8 +78,18 @@ def _discover_scenarios(results_root: pathlib.Path, kernel: str) -> list[tuple[s
 
 
 def _discover_kernels(results_root: pathlib.Path) -> list[str]:
-    """results_root 하위에 존재하는 커널 디렉토리 목록 (KERNELS 순서 유지)."""
-    return [k for k in KERNELS if (results_root / k).is_dir()]
+    """results_root 하위에 존재하는 커널 디렉토리 목록 (KERNELS 순서 유지).
+    커널 서브디렉토리 없이 results_root 바로 아래에 데이터가 있으면 ["linear"] 반환."""
+    found = [k for k in KERNELS if (results_root / k).is_dir()]
+    if not found and any(results_root.rglob("metrics.json")):
+        found = ["linear"]
+    return found
+
+
+def _kernel_root(results_root: pathlib.Path, kernel: str) -> pathlib.Path:
+    """커널 서브디렉토리가 있으면 results_root/kernel, 없으면 results_root 자체 반환."""
+    candidate = results_root / kernel
+    return candidate if candidate.is_dir() else results_root
 
 
 def run_analysis(
@@ -97,12 +108,12 @@ def run_analysis(
 
     cfg = funs.get_config()
     rpm_to_domain = build_rpm_domain_map(cfg)
-    preps = list(cfg.main.preprocessing_ids.values())
+    preps = list(cfg.preprocessing_ids.values())
 
     # ── Step 1 (per-kernel): aggregate → run_metrics.csv + zone_ratio_by_percentile.csv
     for kernel in kernels:
         print(f"\n[summary] aggregating {kernel} …")
-        df = aggregate_summary(results_root / kernel, out_dir=eval_dir / kernel, kernel=kernel)
+        df = aggregate_summary(_kernel_root(results_root, kernel), out_dir=eval_dir / kernel, kernel=kernel)
         if not df.empty:
             (eval_dir / kernel).mkdir(parents=True, exist_ok=True)
             run_metrics_path = eval_dir / kernel / "run_metrics.csv"
@@ -134,12 +145,12 @@ def run_analysis(
     # ── Step 5 (cross-kernel): zone_ratio + AD_performance → tradeoff_summary.csv
     plot_tradeoff_csv(eval_dir, eval_dir / "tradeoff_summary.csv")
 
-    # ── Step 6 (per-kernel): distances.npz → {kernel}/{ds}/{sc}/dual_boundary_polar.png
+    # ── Step 6 (per-kernel): distances.npz → {ds}/{sc}/dual_boundary_polar.png
     for kernel in kernels:
         scenarios = _discover_scenarios(results_root, kernel)
         if scenarios:
             print(f"\n[dual_boundary] {kernel}: {len(scenarios)} scenarios")
-            plot_dual_boundary_polar(results_root, kernel, scenarios, prep_order=preps)
+            plot_dual_boundary_polar(_kernel_root(results_root, kernel), kernel, scenarios, prep_order=preps)
 
     # ── Step 7 (cross-kernel): distances.npz → analysis/distance_ratio_summary.csv
     summarize_distance_ratios(results_root, analysis_dir, rpm_to_domain=rpm_to_domain)

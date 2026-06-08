@@ -372,7 +372,7 @@ def plot_dual_boundary_polar(
     }
 
     for dataset, scenario_id in scenarios:
-        run_dir = results_root / kernel / dataset / scenario_id
+        run_dir = results_root / dataset / scenario_id
 
         def _prep_dir(prep: str) -> pathlib.Path:
             d = run_dir / prep
@@ -452,7 +452,7 @@ def plot_dual_boundary_polar(
             hspace=_hspace, wspace=_wspace,
         )
 
-        out_dir = results_root / kernel / dataset / scenario_id
+        out_dir = results_root / dataset / scenario_id
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "dual_boundary_polar.png"
         fig.savefig(out_path, dpi=150, bbox_inches="tight")

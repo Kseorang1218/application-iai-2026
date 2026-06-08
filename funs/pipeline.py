@@ -33,7 +33,6 @@ def run_otta(
         kernel_name: str,
         scenario_label: str,
         config: dict,
-        config_section: str = "main",
         otta_mode: str = "dual_boundary",
         buffer_cap: int | None = None,
     ) -> dict:
@@ -61,19 +60,18 @@ def run_otta(
       metrics.json              — R + mmd²
     """
     save_dir.mkdir(parents=True, exist_ok=True)
-    cfg = config[config_section]
 
     # ── 1. 모델 인스턴스화 + pre-train ───────────────────────────────────────
     N_src = X_src_train.shape[0]
     if N_src < 2:
         raise ValueError(f"need ≥ 2 source-train samples, got {N_src}")
-    C = 1.0 / (float(cfg['svdd_nu']) * N_src)
+    C = 1.0 / (float(config['svdd_nu']) * N_src)
     kernel = make_kernel(kernel_name, X_src_train)
 
     # n_target_normal: warmup 길이 산출용. 정답 라벨에서 카운트하므로 leakage 이나,
     # 본 실험에서는 의식적 비채택 (server/main/0520_bugfixtodo.md §2 ② 참고).
     n_target_normal = int((y_tgt_stream == 0).sum())
-    warmup_ratio = float(cfg.get('warmup_ratio', 0.0))
+    warmup_ratio = float(config.get('warmup_ratio', 0.0))
 
     # 버퍼 크기 결정:
     #   상한: buffer_cap 지정 시 min(N_src+N_stream, buffer_cap), 없으면 N_src+N_stream.
@@ -83,16 +81,16 @@ def run_otta(
     unbounded_buffer = min(natural_buffer, buffer_cap) if buffer_cap is not None else natural_buffer
     unbounded_buffer = max(unbounded_buffer, min_feasible)
 
-    max_inner_iter = int(cfg.get('max_inner_iter', 10))
+    max_inner_iter = int(config.get('max_inner_iter', 10))
     if otta_mode == "dual_boundary":
         model = DualBoundarySVDD(
             kernel=kernel,
             C=C,
             buffer_size=unbounded_buffer,
-            rho_inner=float(cfg['rho_inner']),
-            rho_outer=float(cfg['rho_outer']),
-            max_iter=int(cfg['svdd_max_iter']),
-            tol=float(cfg['svdd_tol']),
+            rho_inner=float(config['rho_inner']),
+            rho_outer=float(config['rho_outer']),
+            max_iter=int(config['svdd_max_iter']),
+            tol=float(config['svdd_tol']),
             n_target_normal=n_target_normal,
             warmup_ratio=warmup_ratio,
             max_inner_iter=max_inner_iter,
@@ -102,8 +100,8 @@ def run_otta(
             kernel=kernel,
             C=C,
             buffer_size=unbounded_buffer,
-            max_iter=int(cfg['svdd_max_iter']),
-            tol=float(cfg['svdd_tol']),
+            max_iter=int(config['svdd_max_iter']),
+            tol=float(config['svdd_tol']),
             max_inner_iter=max_inner_iter,
         )
 
