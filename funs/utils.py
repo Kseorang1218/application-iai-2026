@@ -7,6 +7,13 @@ def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
     """CLI 인자 파싱. source/target 유효성 검증은 config 로드 후 호출측에서 수행."""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cwru",
+        choices=["cwru", "pu"],
+        help="사용할 데이터셋 (cwru, pu)",
+    )
+    parser.add_argument(
         "--source",
         type=str,
         default=None,

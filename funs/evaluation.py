@@ -156,8 +156,11 @@ class AnomalyDetectionEvaluator:
 
 def build_rpm_domain_map(cfg) -> dict[str, dict[int, str]]:
     """config 에서 {dataset: {rpm: domain_key}} 역매핑 생성."""
-    domain_def = cfg.get("domain", {})
-    return {"cwru": {int(rpm): key for key, rpm in domain_def.items()}}
+    result: dict[str, dict[int, str]] = {}
+    for dataset in ("cwru", "pu"):
+        domain_def = cfg.get(f"{dataset}_domain", {})
+        result[dataset] = {int(rpm): key for key, rpm in domain_def.items()}
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

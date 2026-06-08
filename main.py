@@ -41,7 +41,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="전체 실험 파이프라인")
     parser.add_argument(
         "--out-dir", required=True, metavar="DIR",
-        help="실험 결과 저장 경로 (예: ./results/0607/linear)",
+        help="실험 결과 저장 경로 (예: ./results/0607)",
+    )
+    parser.add_argument(
+        "--dataset", default=None, choices=["cwru", "pu"],
+        help="사용할 데이터셋. 미지정 시 cwru + pu 모두 실행",
     )
     parser.add_argument(
         "--workers", type=int, default=8, metavar="N",
@@ -75,11 +79,15 @@ def main() -> None:
             # ── Step 1: 실험 ───────────────────────────────────────────────
             t0 = time.time()
             tee.write(f"{'='*60}\n[Step 1] 실험 시작\n{'='*60}\n")
-            run_experiment(
-                out_dir=str(out_dir),
-                workers=args.workers,
-                otta_mode=args.otta_mode,
-            )
+            datasets = [args.dataset] if args.dataset else ["cwru", "pu"]
+            for ds in datasets:
+                tee.write(f"\n--- 데이터셋: {ds} ---\n")
+                run_experiment(
+                    dataset=ds,
+                    out_dir=str(out_dir),
+                    workers=args.workers,
+                    otta_mode=args.otta_mode,
+                )
             tee.write(f"\n[Step 1 완료] {time.time()-t0:.1f}s\n")
 
             # ── Step 2: 사후 분석 ──────────────────────────────────────────

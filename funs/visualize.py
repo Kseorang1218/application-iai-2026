@@ -21,7 +21,7 @@ from sklearn.manifold import TSNE
 # ── analysis 공용 상수 ────────────────────────────────────────────────────────
 
 PREP_ORDER   = ["p1_raw", "p3_envspec", "p4_cepstrum", "p6_tds", "p7_orderspec"]
-DATASET_ORDER = ["cwru"]
+DATASET_ORDER = ["cwru", "pu"]
 KERNELS      = ("rbf", "linear")
 
 # 시각화 라벨 (짧은 이름). evaluate_ad_performance 의 풀 이름 _PREP_LABEL 과 별개.

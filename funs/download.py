@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pandas as pd
+import patoolib
 from scipy import io
 
 def download_cwru(root: str, sample_rate: str = "12k") -> pd.DataFrame:
@@ -140,3 +141,114 @@ def download_cwru(root: str, sample_rate: str = "12k") -> pd.DataFrame:
     data_frame = pd.DataFrame(df)
 
     return data_frame
+
+
+def download_paderborn(root: str, sample: bool = False) -> pd.DataFrame:
+    """
+    Paderborn University 데이터셋 다운로드.
+    Reference: https://github.com/junior209lsj/FaultDiagnosisOptimizerBenchmark
+
+    Parameters
+    ----------
+    root : str
+        데이터 파일을 저장할 루트 디렉토리
+    sample : bool
+        True이면 각 베어링당 첫 번째 데이터 파일만 사용
+
+    Returns
+    ----------
+    pd.DataFrame
+        Paderborn University 데이터셋의 데이터 세그먼트를 포함하는 DataFrame
+    """
+    url = "https://groups.uni-paderborn.de/kat/BearingDataCenter"
+    filenames = [
+        ("K001", "N"),
+        ("K002", "N"),
+        ("K003", "N"),
+        ("K004", "N"),
+        ("K005", "N"),
+        ("K006", "N"),
+        ("KI04", "IR"),
+        ("KI14", "IR"),
+        ("KI16", "IR"),
+        ("KI17", "IR"),
+        ("KI18", "IR"),
+        ("KI21", "IR"),
+        ("KA04", "OR"),
+        ("KA15", "OR"),
+        ("KA16", "OR"),
+        ("KA22", "OR"),
+        ("KA30", "OR"),
+    ]
+
+    label_map = {"N": 0, "IR": 1, "OR": 2}
+
+    domains = [
+        "N15_M07_F10",
+        "N09_M07_F10",
+    ]
+
+    domain_statistics = {
+        "N15_M07_F10": (1500, 0.7, 1000),
+        "N09_M07_F10": (900,  0.7, 1000),
+    }
+
+    sample_list = [1] if sample else [x + 1 for x in range(20)]
+
+    if not os.path.isdir(root):
+        os.makedirs(root)
+
+    df = {
+        "data": [],
+        "fault_type": [],
+        "sampling_rate": [],
+        "rpm": [],
+        "load_torque(Nm)": [],
+        "radial_force(N)": [],
+        "label": [],
+        "is_anomaly": [],
+    }
+
+    missing = [f for f in filenames if not os.path.isdir(f"{root}/{f[0]}")]
+    if not missing:
+        print(f"[PU] 모든 베어링 폴더가 이미 존재함 — 다운로드 스킵 ({root})")
+    else:
+        print(f"[PU] {len(missing)}/{len(filenames)}개 베어링 다운로드/추출 필요")
+
+    for filename in filenames:
+        bearing_dir = f"{root}/{filename[0]}"
+        rar_path = f"{root}/{filename[0]}.rar"
+        if not os.path.isdir(bearing_dir):
+            if not os.path.isfile(rar_path):
+                print(f"  {filename[0]}.rar 다운로드 중 ...")
+                os.system(f"wget -O {rar_path} {url}/{filename[0]}.rar")
+            patoolib.extract_archive(rar_path, outdir=root, interactive=False)
+            os.remove(rar_path)
+
+        is_anomaly = 0 if filename[1] == "N" else 1
+
+        for domain in domains:
+            for data_num in sample_list:
+                mat_path = f"{root}/{filename[0]}/{domain}_{filename[0]}_{data_num}.mat"
+                data = io.loadmat(mat_path)
+                y = data[f"{domain}_{filename[0]}_{data_num}"]["Y"][0][0][0]
+
+                body = None
+                for i in range(len(y)):
+                    if y[i]["Name"] == "vibration_1":
+                        body = y[i]["Data"].ravel()
+                        break
+
+                if body is None:
+                    continue
+
+                df["data"].append(body)
+                df["fault_type"].append(filename[1])
+                df["sampling_rate"].append(64)
+                df["rpm"].append(domain_statistics[domain][0])
+                df["load_torque(Nm)"].append(domain_statistics[domain][1])
+                df["radial_force(N)"].append(domain_statistics[domain][2])
+                df["label"].append(label_map[filename[1]])
+                df["is_anomaly"].append(is_anomaly)
+
+    return pd.DataFrame(df)

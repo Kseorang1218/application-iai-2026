@@ -33,7 +33,7 @@ I/O 요약 (--results-root 를 ROOT 로 표기):
 
   Step 6  plot_dual_boundary_polar
     reads : ROOT/{kernel}/{ds}/{sc}/{prep}/distances.npz
-    writes: ROOT/{kernel}/{ds}/{sc}/dual_boundary_polar.png  (all scenarios)
+    writes: ROOT/{kernel}/{ds}/{sc}/dual_boundary_polar.png  (per-scenario)
 
   Step 7  summarize_distance_ratios
     reads : ROOT/{kernel}/{ds}/{sc}/{prep}/distances.npz
@@ -57,7 +57,6 @@ from funs.evaluation import (
 from funs.visualize import (
     plot_cm_by_dataset,
     plot_dual_boundary_polar,
-    plot_dual_boundary_polar_grid,
     plot_tradeoff_csv,
 )
 
@@ -155,18 +154,6 @@ def run_analysis(
         if scenarios:
             print(f"\n[dual_boundary] {kernel}: {len(scenarios)} scenarios")
             plot_dual_boundary_polar(_kernel_root(results_root, kernel), kernel, scenarios, prep_order=preps)
-
-    # ── Step 6b (per-kernel): 전 시나리오 통합 polar grid → analysis/{kernel}/dual_boundary_polar.png
-    for kernel in kernels:
-        scenarios = _discover_scenarios(results_root, kernel)
-        if scenarios and preps:
-            (analysis_dir / kernel).mkdir(parents=True, exist_ok=True)
-            plot_dual_boundary_polar_grid(
-                _kernel_root(results_root, kernel), kernel, scenarios,
-                out_path=analysis_dir / kernel / "dual_boundary_polar.png",
-                prep=preps[0],
-                rpm_domain_map=rpm_to_domain,
-            )
 
     # ── Step 7 (cross-kernel): distances.npz → analysis/distance_ratio_summary.csv
     summarize_distance_ratios(results_root, analysis_dir, rpm_to_domain=rpm_to_domain)
