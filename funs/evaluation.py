@@ -232,20 +232,7 @@ def evaluate_ad_performance(
 
         result = evaluator.evaluate(y_true, y_score, y_pred)
 
-        run_dir = dist_path.parent
-        cm_title = f"{dataset} | {scenario_id} | {prep_id} ({kernel})"
-        cm = evaluator.get_confusion_matrix(
-            y_true, y_pred,
-            save_path=run_dir / "confusion_matrix.png",
-            title=cm_title,
-        )
-        with open(run_dir / "confusion_matrix.json", "w") as fp:
-            json.dump(
-                {"kernel": kernel, "dataset": dataset,
-                 "scenario_id": scenario_id, "preprocessing": prep_id,
-                 **cm, **result},
-                fp, indent=2,
-            )
+        cm = evaluator.get_confusion_matrix(y_true, y_pred)
 
         raw_rows.append({
             "kernel": kernel, "dataset": dataset,

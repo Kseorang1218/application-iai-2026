@@ -1,24 +1,18 @@
 """OTTA streaming 결과 사후 분석 — `analysis.py` 의 OTTA 버전.
 
-`analysis.py` 가 `distances.npz` (pre-trained 모델 기준 batch 평가) 를 다룬다면,
-본 스크립트는 `otta_stream.npz` (streaming 중 매 step 의 decisions/scores/latencies
-/R_trace) 를 다룬다. 두 평가의 차이가 곧 **adaptation 효과** 다.
-
 CLI:
   python analysis_otta.py --results-root results/{date} [--out-dir DIR]
 
 I/O 요약:
   reads : ROOT/{kernel}/{ds}/{sc}/{prep}/otta_stream.npz
-  writes: ROOT/{kernel}/{ds}/{sc}/{prep}/confusion_matrix_otta.png   (per-run)
-          ROOT/{kernel}/{ds}/{sc}/{prep}/confusion_matrix_otta.json  (per-run)
-          ROOT/evaluation/otta_performance_all.csv
+  writes: ROOT/evaluation/otta_performance_all.csv
+          ROOT/{kernel}/{ds}/{sc}/R_trace.png
 """
 from __future__ import annotations
 
 import argparse
 import json
 import pathlib
-import shutil
 
 import matplotlib
 matplotlib.use("Agg")
@@ -30,7 +24,6 @@ import pandas as pd
 
 import funs
 from funs.evaluation import AnomalyDetectionEvaluator, KERNELS, build_rpm_domain_map
-from funs.visualize import plot_cm_by_dataset
 
 
 _DECISION_NAMES = {0: "NORMAL_SKIP", 1: "ADAPTED", 2: "ANOMALY"}
@@ -118,27 +111,12 @@ def evaluate_otta_performance(
         y_pred  = (decisions == 2).astype(int)
         y_score = -scores.astype(float)
 
-        run_dir = stream_path.parent
+        cm = evaluator.get_confusion_matrix(y_true, y_pred)
         if int((y_true == 1).sum()) == 0 or int((y_true == 0).sum()) == 0:
             metrics = {"accuracy": float("nan"), "recall": float("nan"),
                        "f1_score": float("nan"), "auc": float("nan")}
-            cm = evaluator.get_confusion_matrix(y_true, y_pred)
         else:
-            cm_title = f"OTTA: {dataset} | {scenario_id} | {prep_id} ({kernel})"
-            cm = evaluator.get_confusion_matrix(
-                y_true, y_pred,
-                save_path=run_dir / "confusion_matrix_otta.png",
-                title=cm_title,
-            )
             metrics = evaluator.evaluate(y_true, y_score, y_pred)
-
-            with open(run_dir / "confusion_matrix_otta.json", "w") as fp:
-                json.dump(
-                    {"kernel": kernel, "dataset": dataset,
-                     "scenario_id": scenario_id, "preprocessing": prep_id,
-                     **cm, **metrics},
-                    fp, indent=2,
-                )
 
         precision = cm["TP"] / (cm["TP"] + cm["FP"]) if (cm["TP"] + cm["FP"]) > 0 else 0.0
 
@@ -227,137 +205,6 @@ def evaluate_otta_performance(
     df.to_csv(full_csv, index=False, float_format="%.6f")
     print(f"[otta] {len(rows)} runs evaluated → {full_csv}")
     return df
-
-
-def plot_cm_by_dataset_otta(
-        otta_csv: pathlib.Path,
-        out_dir: pathlib.Path,
-    ) -> None:
-    """파일명에 `_otta` 접미 붙여 `plot_cm_by_dataset` 출력과 충돌 방지.
-
-    임시 폴더에 생성 후 rename → out_dir 로 이동.
-    """
-    otta_csv = pathlib.Path(otta_csv)
-    out_dir = pathlib.Path(out_dir)
-    if not otta_csv.exists():
-        print(f"[cm_otta] {otta_csv} 없음 — skip")
-        return
-    out_dir.mkdir(parents=True, exist_ok=True)
-    tmp_dir = out_dir / "_tmp_otta_cm"
-    if tmp_dir.exists():
-        shutil.rmtree(tmp_dir)
-    tmp_dir.mkdir(parents=True)
-    try:
-        plot_cm_by_dataset(otta_csv, tmp_dir)
-        for src in tmp_dir.glob("cm_*.png"):
-            dst = out_dir / src.name.replace(".png", "_otta.png")
-            shutil.move(str(src), str(dst))
-            print(f"[cm_otta] → {dst}")
-    finally:
-        if tmp_dir.exists():
-            shutil.rmtree(tmp_dir)
-
-
-def plot_baseline_vs_otta(
-        baseline_csv: pathlib.Path,
-        otta_csv: pathlib.Path,
-        out_csv: pathlib.Path,
-        out_dir: pathlib.Path,
-        kernel_filter: str | None = None,
-    ) -> pd.DataFrame:
-    """baseline (AD_performance_all.csv) vs OTTA (otta_performance_all.csv) 비교.
-
-    Outputs:
-      out_csv                         — merged + Δ 컬럼
-      out_dir/baseline_vs_otta_box.png — ΔAUC, ΔF1 boxplot by prep
-
-    Δ = OTTA - baseline. 양수면 adaptation 으로 성능 향상.
-    """
-    baseline_csv = pathlib.Path(baseline_csv)
-    otta_csv     = pathlib.Path(otta_csv)
-    if not baseline_csv.exists() or not otta_csv.exists():
-        print(f"[cmp] missing csv: baseline={baseline_csv.exists()} otta={otta_csv.exists()} — skip")
-        return pd.DataFrame()
-
-    bl = pd.read_csv(baseline_csv)
-    ot = pd.read_csv(otta_csv)
-
-    if kernel_filter is not None and "kernel" in bl.columns:
-        bl = bl[bl["kernel"] == kernel_filter]
-
-    # baseline 의 scenario = scenario_id ("1797_to_1772") vs OTTA 의 scenario = "A->B"
-    # 불일치 → (kernel, dataset, source, target, prep) 로 매칭. 두 csv 모두 source/target 컬럼 보유.
-    bl_prep_col = "prep" if "prep" in bl.columns else "preprocessing"
-    ot_prep_col = "preprocessing" if "preprocessing" in ot.columns else "prep"
-
-    bl_sub = bl[["kernel", "dataset", "source", "target", bl_prep_col,
-                 "AUC", "F1", "Recall"]].rename(
-        columns={bl_prep_col: "prep", "AUC": "AUC_baseline", "F1": "F1_baseline", "Recall": "Recall_baseline"}
-    )
-    ot_sub = ot[["kernel", "dataset", "source", "target", ot_prep_col,
-                 "AUC", "F1", "Recall"]].rename(
-        columns={ot_prep_col: "prep", "AUC": "AUC_otta", "F1": "F1_otta", "Recall": "Recall_otta"}
-    )
-    # source/target 형 통일 (baseline 은 rpm_to_domain 적용으로 도메인 key 'A'/'B' 형태)
-    for sub in (bl_sub, ot_sub):
-        sub["source"] = sub["source"].astype(str)
-        sub["target"] = sub["target"].astype(str)
-    m = bl_sub.merge(ot_sub, on=["kernel", "dataset", "source", "target", "prep"], how="inner")
-    m["scenario"] = m["source"] + "->" + m["target"]
-    m["dAUC"]    = m["AUC_otta"]    - m["AUC_baseline"]
-    m["dF1"]     = m["F1_otta"]     - m["F1_baseline"]
-    m["dRecall"] = m["Recall_otta"] - m["Recall_baseline"]
-
-    out_csv = pathlib.Path(out_csv)
-    out_csv.parent.mkdir(parents=True, exist_ok=True)
-    m.to_csv(out_csv, index=False, float_format="%.6f")
-    print(f"[cmp] {len(m)} rows → {out_csv}")
-
-    out_dir = pathlib.Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    preps = sorted(m["prep"].unique())
-    cmap = plt.get_cmap("tab10")
-    colors = {p: cmap(i % 10) for i, p in enumerate(preps)}
-
-    # ── boxplot: ΔAUC, ΔF1 by prep ─────────────────────────────────
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
-    for ax, col, title in zip(
-        axes,
-        ["dAUC", "dF1"],
-        ["ΔAUC (OTTA − baseline)", "ΔF1 (OTTA − baseline)"],
-    ):
-        # 데이터 있는 prep 만 — boxplot dimension mismatch 방지
-        pairs = [(p, m[m["prep"] == p][col].dropna().values) for p in preps]
-        pairs = [(p, v) for p, v in pairs if len(v) > 0]
-        if not pairs:
-            ax.text(0.5, 0.5, "no data", ha="center", va="center")
-            ax.axis("off")
-            continue
-        labels_present = [p for p, _ in pairs]
-        data           = [v for _, v in pairs]
-        bp_kw = {"showmeans": True}
-        try:
-            ax.boxplot(data, tick_labels=labels_present, **bp_kw)
-        except TypeError:
-            ax.boxplot(data, labels=labels_present, **bp_kw)
-        ax.axhline(0, color="k", lw=1, alpha=0.5)
-        ax.set_title(title)
-        ax.set_ylabel(col)
-        ax.grid(axis="y", alpha=0.3)
-
-    legend_handles = [
-        mlines.Line2D([], [], color="orange", lw=2, label="Median"),
-        mlines.Line2D([], [], color="green", marker="^", ms=7, ls="None", label="Mean"),
-    ]
-    fig.legend(handles=legend_handles, loc="lower center", ncol=2,
-               fontsize=10, bbox_to_anchor=(0.5, 0.01), frameon=True)
-    fig.tight_layout(rect=[0, 0.10, 1, 1])
-    bp_path = out_dir / "baseline_vs_otta_box.png"
-    fig.savefig(bp_path, dpi=150)
-    plt.close(fig)
-    print(f"[cmp] boxplot → {bp_path}")
-
-    return m
 
 
 _PREP_ORDER = ("p4_cepstrum",)
@@ -527,18 +374,6 @@ def run_analysis_otta(
         evaluate_otta_performance(
             results_root, kernel_eval_dir,
             rpm_to_domain=rpm_to_domain, kernel_filter=k,
-        )
-
-        plot_cm_by_dataset_otta(
-            kernel_eval_dir / "otta_performance_all.csv", kernel_analysis_dir,
-        )
-
-        plot_baseline_vs_otta(
-            baseline_csv=eval_dir / "AD_performance_all.csv",
-            otta_csv=kernel_eval_dir / "otta_performance_all.csv",
-            out_csv=kernel_eval_dir / "baseline_vs_otta.csv",
-            out_dir=kernel_analysis_dir,
-            kernel_filter=k,
         )
 
     plot_R_trace_by_scenario(results_root, rpm_domain_map=rpm_to_domain)
