@@ -14,42 +14,10 @@ def parse_args(description: str = "Experiment Runner") -> argparse.Namespace:
         help="사용할 데이터셋 (cwru, pu)",
     )
     parser.add_argument(
-        "--source",
-        type=str,
-        default=None,
-        metavar="DOMAIN_KEY",
-        help="소스 도메인 키 (예: A, B). 미지정 시 해당 데이터셋의 모든 도메인 사용",
-    )
-    parser.add_argument(
-        "--target",
-        type=str,
-        default=None,
-        metavar="DOMAIN_KEY",
-        help="타겟 도메인 키 (예: A, B). 미지정 시 해당 데이터셋의 모든 도메인 사용",
-    )
-    parser.add_argument(
         "--out-dir",
         type=str,
         default="results",
         help="결과물을 저장할 디렉토리 이름 (기본값: results)",
-    )
-    parser.add_argument(
-        "--otta-mode",
-        type=str,
-        default="dual_boundary",
-        choices=["dual_boundary", "single_boundary"],
-        help=(
-            "OTTA 모드 선택 (기본값: dual_boundary).\n"
-            "  dual_boundary   — DualBoundarySVDD: inner skip / adaptation / outer anomaly 3-zone 분기\n"
-            "  single_boundary — OnlineSVDD: 초기 warmup 후 예측 기반 TTA (정상→adapt, 고장→skip)"
-        ),
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=1,
-        metavar="N",
-        help="병렬로 실행할 시나리오 수 (기본값: 1 = 순차). RPi 배포 시 반드시 1 사용.",
     )
     return parser.parse_args()
 

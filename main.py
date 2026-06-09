@@ -1,8 +1,7 @@
 """전체 실험 파이프라인 오케스트레이터.
 
 사용법:
-  python main.py --date 0607
-  python main.py --date 0607 --kernel rbf --workers 4
+  python main.py --out-dir ./results/0607
 
 로그: log/run_<timestamp>.log (stdout 동시 출력)
 """
@@ -47,15 +46,6 @@ def main() -> None:
         "--dataset", default=None, choices=["cwru", "pu"],
         help="사용할 데이터셋. 미지정 시 cwru + pu 모두 실행",
     )
-    parser.add_argument(
-        "--workers", type=int, default=8, metavar="N",
-        help="병렬 시나리오 수 (기본값: 8)",
-    )
-    parser.add_argument(
-        "--otta-mode", default="dual_boundary",
-        choices=["dual_boundary", "single_boundary"],
-        help="OTTA 모드 (기본값: dual_boundary)",
-    )
     args = parser.parse_args()
 
     log_dir = _ROOT / "log"
@@ -73,8 +63,7 @@ def main() -> None:
 
         try:
             tee.write(f"로그 경로: {log_path}\n")
-            tee.write(f"결과 경로: {results_root}\n")
-            tee.write(f"workers: {args.workers}\n\n")
+            tee.write(f"결과 경로: {results_root}\n\n")
 
             # ── Step 1: 실험 ───────────────────────────────────────────────
             t0 = time.time()
@@ -85,8 +74,6 @@ def main() -> None:
                 run_experiment(
                     dataset=ds,
                     out_dir=str(out_dir),
-                    workers=args.workers,
-                    otta_mode=args.otta_mode,
                 )
             tee.write(f"\n[Step 1 완료] {time.time()-t0:.1f}s\n")
 
