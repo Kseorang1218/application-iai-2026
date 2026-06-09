@@ -20,11 +20,7 @@ import json
 import warnings
 from pathlib import Path
 
-try:
-    import cupy as xp
-except ImportError:
-    import numpy as xp
-
+import numpy as xp
 import numpy as np
 
 from typing import Any
@@ -37,7 +33,7 @@ EPS_F32: float = float(np.finfo(np.float32).eps) * 10
 
 def _to_numpy(arr) -> np.ndarray:
     """CuPy 배열이면 CPU로 이동, numpy이면 그대로 반환."""
-    return arr.get() if hasattr(arr, 'get') else np.asarray(arr)
+    return np.asarray(arr)
 
 
 # 공통 R² 산출 헬퍼 (OnlineSVDD 도 import 해서 사용)

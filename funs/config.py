@@ -4,7 +4,7 @@ _CONFIG: dict = {
     "seed": 42,
 
     "cwru": {
-        "domains":       {"A": 1730, "B": 1750, "C": 1772, "D": 1797},
+        "domains":       {"A": 1730, "D": 1797},
         "sampling_rate": 12000,
         "window_size":   2048,
         "lifter_n":      64,

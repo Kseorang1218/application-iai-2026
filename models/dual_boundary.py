@@ -22,10 +22,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-try:
-    import cupy as xp
-except ImportError:
-    import numpy as xp
+import numpy as xp
 
 import numpy as np
 

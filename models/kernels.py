@@ -1,14 +1,11 @@
-"""RBF (Gaussian) kernel — CuPy / NumPy vectorized 구현.
+"""RBF (Gaussian) kernel — NumPy vectorized 구현.
 
 SVDD 학습/추론에서 사용. dual form 거리 계산에 K(x, x) = 1 이라는 RBF
 특수 성질이 활용되므로, 다른 커널로 확장할 때는 호출 측에서 diag()를
 명시적으로 호출하도록 인터페이스를 통일한다.
 """
 
-try:
-    import cupy as xp
-except ImportError:
-    import numpy as xp
+import numpy as xp
 
 import numpy as np  # __main__ 및 타입 힌트용
 

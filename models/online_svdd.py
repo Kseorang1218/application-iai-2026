@@ -12,10 +12,7 @@ OTTA 전제: 데이터 한 샘플씩 순차 유입, 반복 학습 불가.
 
 from __future__ import annotations
 
-try:
-    import cupy as xp
-except ImportError:
-    import numpy as xp
+import numpy as xp
 
 import numpy as np
 

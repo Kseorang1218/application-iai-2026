@@ -15,9 +15,9 @@ import funs
 
 _root = pathlib.Path(__file__).parent
 
-_DOWNLOAD = {
-    "cwru": lambda d: funs.download_cwru(str(d / "cwru"), "12k"),
-    "pu":   lambda d: funs.download_paderborn(str(d / "pu")),
+_LOAD = {
+    "cwru": lambda d: funs.load_cwru(str(d / "cwru"), "12k"),
+    "pu":   lambda d: funs.load_paderborn(str(d / "pu")),
 }
 _POSTPROCESS = {
     "cwru": lambda df: df[df["label"] != 999],
@@ -166,7 +166,7 @@ def run_experiment(
         print(f"  {s}({domain_dict[s]}rpm) → {t}({domain_dict[t]}rpm)")
 
     dataset_dir = _root / "dataset"
-    df = _POSTPROCESS[dataset](_DOWNLOAD[dataset](dataset_dir))
+    df = _POSTPROCESS[dataset](_LOAD[dataset](dataset_dir))
 
     results_root = pathlib.Path(out_dir)
     results_root.mkdir(parents=True, exist_ok=True)
