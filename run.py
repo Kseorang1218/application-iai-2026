@@ -34,7 +34,7 @@ def run_scenario(
     scenario_label = f"{dataset} {source_key}({source_rpm}) → {target_key}({target_rpm})"
 
     # ----- Source/Target raw split -----
-    source_train_raw, source_val_raw, _, target_raw = funs.split_dataframe(
+    source_train_raw, _, _, target_raw = funs.split_dataframe(
         df, source_domain=source_rpm, target_domain=target_rpm,
     )
 
@@ -47,17 +47,11 @@ def run_scenario(
         target_raw, window_size=ws, stride=ws,
     )
 
-    source_val_normal = source_val_raw[source_val_raw["is_anomaly"] == 0]
-    S_X_val, _ = funs.build_source_xy(
-        source_val_normal, window_size=ws, stride=ws,
-    )
-
     # ----- Feature 추출 -----
     lifter_n = config[dataset]["lifter_n"]
     feature_fns = funs.make_feature_fns(lifter_n=lifter_n)
 
     S_train_feats = {k: fn(S_X_train) for k, fn in feature_fns.items()}
-    S_val_feats   = {k: fn(S_X_val)   for k, fn in feature_fns.items()}
     T_feats = funs.extract_target_stream_features(T_X_stream, feature_fns)
 
     otta_config = {**config, **config[dataset]}

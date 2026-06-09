@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 ### 전체 파이프라인 (`main.py`)
 
-실험 → OTTA 평가를 순서대로 실행하며 로그를 `log/`에 저장.
+실험을 실행하고 로그를 `log/`에 저장
 
 ```bash
 python main.py --out-dir ./results/0608              # cwru + pu 모두 실행
@@ -20,17 +20,11 @@ python main.py --out-dir ./results/0608 --dataset cwru
 python main.py --out-dir ./results/0608 --dataset pu
 ```
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `--out-dir` | (필수) | 결과 저장 경로 |
-| `--dataset` | (없으면 전체) | `cwru` 또는 `pu`. 미지정 시 둘 다 실행 |
+| 옵션 | 설명 |
+|------|------|
+| `--out-dir` | (필수) 결과 저장 경로 |
+| `--dataset` | `cwru` 또는 `pu`. 미지정 시 둘 다 순차 실행 |
 
-### 단일 실험 (`run.py`)
-
-```bash
-python run.py --dataset cwru --out-dir ./results/0608
-python run.py --dataset pu   --out-dir ./results/0608
-```
 
 ## 결과 구조
 
@@ -39,18 +33,33 @@ results/<date>/
 ├── <dataset>/
 │   └── <source_rpm>_to_<target_rpm>/
 │       └── p4_cepstrum/
-│           ├── svdd_model.npz   # 최종 적응 모델 (Support Vectors, alpha)
-│           └── svdd_model.json  # 모델 메타 (kernel, C, R2 등)
+│           ├── svdd_model.npz   # 최종 모델 (Support Vectors, alpha)
+│           └── svdd_model.json  # 모델 메타 (kernel, C, R², n_iter)
 └── evaluation/
-    └── otta_performance_all.csv
+    └── otta_performance_all.csv  # 전체 시나리오 × OTTA 지표
 log/
 └── run_<timestamp>.log
 ```
 
-### 저장된 모델 로드
+`otta_performance_all.csv` 주요 컬럼: `AUC`, `F1`, `Recall`, `precision`, `R_pretrain`, `R_final`, `R_growth_pct`, `detection_delay`, `latency_mean_ms`
 
-```python
-from models.svdd import SVDD
-model = SVDD.load("results/0608/cwru/1730_to_1750/p4_cepstrum/svdd_model")
-scores = model.decision_function(X_new)  # 양수: 정상, 음수: 이상
+## 모듈 구조
+
+```
+models/
+  svdd.py           — Batch SMO 기반 SVDD (base class)
+  online_svdd.py    — OnlineSVDD: 고정 SV 버퍼 + partial_fit() 스트리밍
+  dual_boundary.py  — DualBoundarySVDD: 3-zone 고정 경계 기반 OTTA (핵심 기여)
+  kernels.py        — RBFKernel, LinearKernel, PolyKernel
+
+funs/
+  pipeline.py       — run_otta(): pre-train → 스트리밍 루프 → 평가 메트릭 반환
+  databuilder.py    — split_dataframe(), build_source_xy(), build_target_stream()
+  features.py       — make_feature_fns(), extract_target_stream_features()
+  preprocessing.py  — cepstrum(): real cepstrum (IFFT(log|FFT(x)|))
+  train.py          — make_kernel()
+  evaluation.py     — AnomalyDetectionEvaluator, build_rpm_domain_map()
+  download.py       — load_cwru(), load_paderborn()
+  config.py         — get_config()
+  utils.py          — parse_args(), median_heuristic_gamma()
 ```
