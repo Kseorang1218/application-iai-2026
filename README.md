@@ -1,5 +1,9 @@
 # application-iai-2026
-[2026-1] 산업인공지능응용 — DualBoundarySVDD 기반 Online Test-Time Adaptation (OTTA) for Anomaly Detection
+[2026-1] 산업인공지능응용 — Dual-BoundarySVDD 기반 OTTA를 통한 베어링 결함 탐지
+
+> 💡 **[참고사항]**
+> 본 코드는 제출을 위해 데이터셋 일부 파일만을 테스트 파일로 포함합니다.
+> 전체 실험 코드는 [application-iai-2026 저장소](https://github.com/Kseorang1218/application-iai-2026.git)에서 확인하실 수 있습니다.
 
 ## 환경 설정
 
