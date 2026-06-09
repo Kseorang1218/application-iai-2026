@@ -4,6 +4,7 @@ import pathlib
 import pandas as pd
 
 import funs
+from analysis_otta import plot_R_trace_single
 
 _root = pathlib.Path(__file__).parent
 
@@ -67,7 +68,7 @@ def run_scenario(
 
     try:
         buffer_cap = otta_config.get('no_constraint_buffer_cap', None)
-        model_dir = pathlib.Path(out_dir) / dataset / scenario_id / "p4_cepstrum"
+        model_dir = pathlib.Path(out_dir) / dataset / scenario_id
         m = funs.run_otta(
             X_src_train=X_src,
             X_tgt_stream=T_X,
@@ -89,6 +90,24 @@ def run_scenario(
     m["target"]     = target_key
     m["source_rpm"] = source_rpm
     m["target_rpm"] = target_rpm
+
+    R_trace    = m.pop("_R_trace", None)
+    y_true_arr = m.pop("_y_true", None)
+    decisions  = m.pop("_decisions", None)
+    n_warmup   = m.pop("_n_warmup", 0)
+
+    if R_trace is not None:
+        plot_R_trace_single(
+            R_trace=R_trace,
+            y_true=y_true_arr,
+            decisions=decisions,
+            R_pretrain=m.get("R_pretrain", 0.0),
+            n_warmup=n_warmup,
+            dataset=dataset,
+            sc_label=f"{source_key}→{target_key}",
+            kernel="linear",
+            save_path=pathlib.Path(out_dir) / dataset / scenario_id / "R_trace.png",
+        )
 
     status = "OK" if "error" not in m else "ERR"
     print(f"  [{status}]  "

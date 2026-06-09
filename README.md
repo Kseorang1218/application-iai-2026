@@ -4,6 +4,7 @@
 ## 환경 설정
 
 ```bash
+python -m venv iai      # 가상환경 생성
 source iai/bin/activate
 pip install -r requirements.txt
 ```
@@ -15,9 +16,7 @@ pip install -r requirements.txt
 실험을 실행하고 로그를 `log/`에 저장
 
 ```bash
-python main.py --out-dir ./results/0608              # cwru + pu 모두 실행
-python main.py --out-dir ./results/0608 --dataset cwru
-python main.py --out-dir ./results/0608 --dataset pu
+python main.py --out-dir ./results
 ```
 
 | 옵션 | 설명 |
@@ -32,11 +31,15 @@ python main.py --out-dir ./results/0608 --dataset pu
 results/<date>/
 ├── <dataset>/
 │   └── <source_rpm>_to_<target_rpm>/
-│       └── p4_cepstrum/
-│           ├── svdd_model.npz   # 최종 모델 (Support Vectors, alpha)
-│           └── svdd_model.json  # 모델 메타 (kernel, C, R², n_iter)
+│       ├── otta_stream.npz       # decisions, scores, y_true, latencies, R_trace, R_pretrain, R_final
+│       ├── distances.npz         # pre-train 모델 거리 (source_train/val, target_normal/fault, R)
+│       ├── distances_final.npz   # 적응 후 거리
+│       ├── svdd_model.npz        # 최종 모델 (Support Vectors, alpha)
+│       ├── svdd_model.json       # 모델 메타 (kernel, C, R², n_iter)
+│       └── metrics.json
 └── evaluation/
-    └── otta_performance_all.csv  # 전체 시나리오 × OTTA 지표
+    ├── AD_performance_all.csv        # 소스 도메인 AD 성능
+    └── otta_performance_all.csv      # 전체 시나리오 × OTTA 지표
 log/
 └── run_<timestamp>.log
 ```

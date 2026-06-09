@@ -231,6 +231,69 @@ def _scenario_label(dataset: str, scenario_id: str,
         return scenario_id
 
 
+def plot_R_trace_single(
+    R_trace: np.ndarray,
+    y_true: np.ndarray,
+    decisions: np.ndarray,
+    R_pretrain: float,
+    n_warmup: int = 0,
+    dataset: str = "",
+    sc_label: str = "",
+    kernel: str = "linear",
+    save_path: "pathlib.Path | str | None" = None,
+) -> None:
+    """단일 시나리오 R_trace 그래프. save_path 지정 시 PNG 저장."""
+    kernel_label = _KERNEL_LABEL.get(kernel, kernel.upper())
+    x = np.arange(len(R_trace))
+
+    fig, ax = plt.subplots(figsize=(8, 3.5))
+
+    anom_idx = np.where(y_true == 1)[0]
+    if anom_idx.size > 0:
+        ax.axvspan(anom_idx[0], anom_idx[-1], color="red", alpha=0.08)
+    if n_warmup > 0:
+        ax.axvspan(0, n_warmup - 1, color="green", alpha=0.10)
+
+    ax.plot(x, R_trace, color="C0", lw=1.0)
+    ax.axhline(R_pretrain, color="gray", ls="--", lw=0.8,
+               label=f"$R_{{pre}}$={R_pretrain:.3f}")
+
+    an_idx = np.where((decisions == 1) & (y_true == 0))[0]
+    af_idx = np.where((decisions == 1) & (y_true == 1))[0]
+    if an_idx.size > 0:
+        ax.scatter(an_idx, R_trace[an_idx], color="green", s=4, alpha=0.5, zorder=4)
+    if af_idx.size > 0:
+        ax.scatter(af_idx, R_trace[af_idx], color="orange", s=8, alpha=0.8, zorder=5)
+
+    ax.set_title(_PREP_LABEL.get("p4_cepstrum", "Cepstrum"), fontsize=13)
+    ax.set_xlabel("Sample index", fontsize=11)
+    ax.set_ylabel("R (radius)", fontsize=11)
+    ax.tick_params(labelsize=10)
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=11, loc="best")
+
+    shared_handles = [
+        mpatches.Patch(color="red",    alpha=0.25, label="Anomaly region"),
+        mpatches.Patch(color="green",  alpha=0.30, label=f"Warmup (N={n_warmup})"),
+        mlines.Line2D([], [], color="green",  marker="o", ms=6,
+                      ls="None", alpha=0.7, label="Adapted-Normal"),
+        mlines.Line2D([], [], color="orange", marker="o", ms=6,
+                      ls="None", alpha=0.9, label="Adapted-Fault"),
+    ]
+    fig.suptitle(
+        f"{dataset.upper()} | {sc_label}", fontsize=13
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.91])
+    fig.legend(handles=shared_handles, loc="upper center", ncol=4,
+               fontsize=11, bbox_to_anchor=(0.5, 0.95),
+               frameon=True, framealpha=0.8)
+
+    if save_path is not None:
+        pathlib.Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_R_trace_by_scenario(
         results_root: pathlib.Path,
         rpm_domain_map: dict | None = None,
