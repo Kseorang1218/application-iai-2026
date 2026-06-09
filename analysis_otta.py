@@ -82,6 +82,10 @@ def evaluate_otta_performance(
         elif len(rel.parts) == 4:
             kernel = "linear"
             dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        elif len(rel.parts) == 3:
+            kernel = "linear"
+            dataset, scenario_id = rel.parts[0], rel.parts[1]
+            prep_id = "p4_cepstrum"
         else:
             continue
         if kernel_filter is not None and kernel != kernel_filter:
@@ -251,6 +255,10 @@ def plot_R_trace_by_scenario(
         elif len(rel.parts) == 4:
             kernel = "linear"
             dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        elif len(rel.parts) == 3:
+            kernel = "linear"
+            dataset, scenario_id = rel.parts[0], rel.parts[1]
+            prep_id = "p4_cepstrum"
         else:
             continue
         groups.setdefault((kernel, dataset, scenario_id), []).append((prep_id, stream_path))
@@ -368,11 +376,9 @@ def run_analysis_otta(
             continue
 
         print(f"\n{'='*50}\n[otta] kernel={k}\n{'='*50}")
-        kernel_eval_dir     = eval_dir / k
-        kernel_analysis_dir = results_root / "analysis" / k
 
         evaluate_otta_performance(
-            results_root, kernel_eval_dir,
+            results_root, eval_dir,
             rpm_to_domain=rpm_to_domain, kernel_filter=k,
         )
 

@@ -12,8 +12,6 @@ import time
 from datetime import datetime
 
 from run import run_experiment
-from analysis import run_analysis
-from analysis_otta import run_analysis_otta
 
 _ROOT = pathlib.Path(__file__).parent
 
@@ -76,18 +74,6 @@ def main() -> None:
                     out_dir=str(out_dir),
                 )
             tee.write(f"\n[Step 1 완료] {time.time()-t0:.1f}s\n")
-
-            # ── Step 2: 사후 분석 ──────────────────────────────────────────
-            t1 = time.time()
-            tee.write(f"\n{'='*60}\n[Step 2] 사후 분석 시작\n{'='*60}\n")
-            run_analysis(results_root=results_root)
-            tee.write(f"\n[Step 2 완료] {time.time()-t1:.1f}s\n")
-
-            # ── Step 3: OTTA 평가 ──────────────────────────────────────────
-            t2 = time.time()
-            tee.write(f"\n{'='*60}\n[Step 3] OTTA 평가 시작\n{'='*60}\n")
-            run_analysis_otta(results_root=results_root)
-            tee.write(f"\n[Step 3 완료] {time.time()-t2:.1f}s\n")
 
             elapsed = time.time() - t0
             tee.write(f"\n{'='*60}\n전체 완료: {elapsed:.1f}s\n{'='*60}\n")

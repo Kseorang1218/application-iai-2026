@@ -201,6 +201,10 @@ def evaluate_ad_performance(
         elif len(rel.parts) == 4:
             kernel = "linear"
             dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        elif len(rel.parts) == 3:
+            kernel = "linear"
+            dataset, scenario_id = rel.parts[0], rel.parts[1]
+            prep_id = "p4_cepstrum"
         else:
             continue
 
@@ -303,6 +307,10 @@ def summarize_distance_ratios(
         elif len(rel.parts) == 4:
             kernel = "linear"
             dataset, scenario_id, prep_id = rel.parts[0], rel.parts[1], rel.parts[2]
+        elif len(rel.parts) == 3:
+            kernel = "linear"
+            dataset, scenario_id = rel.parts[0], rel.parts[1]
+            prep_id = "p4_cepstrum"
         else:
             continue
 

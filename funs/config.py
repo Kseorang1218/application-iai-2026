@@ -22,10 +22,6 @@ _CONFIG: dict = {
         "rho_outer":     1.2,
     },
 
-    "preprocessing_ids": {
-        "cepstrum": "p4_cepstrum",
-    },
-
     "svdd_nu":                0.1,
     "svdd_max_iter":          1000,
     "svdd_tol":               0.001,
